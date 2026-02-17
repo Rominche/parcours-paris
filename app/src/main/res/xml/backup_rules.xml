@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<full-backup-content>
+    <!-- Exclure la base de données du backup automatique pour éviter les corruptions -->
+    <exclude domain="database" path="parcours_paris_db" />
+    <exclude domain="database" path="parcours_paris_db-shm" />
+    <exclude domain="database" path="parcours_paris_db-wal" />
+</full-backup-content>

@@ -1,0 +1,29 @@
+{
+  "type": "FeatureCollection",
+  "features": [
+    {
+      "type": "Feature",
+      "properties": { "osm_way_id": 1001 },
+      "geometry": {
+        "type": "LineString",
+        "coordinates": [[2.3522, 48.8566], [2.3530, 48.8570]]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": { "osm_way_id": 1002 },
+      "geometry": {
+        "type": "LineString",
+        "coordinates": [[2.3530, 48.8570], [2.3540, 48.8575]]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": { "osm_way_id": 1003 },
+      "geometry": {
+        "type": "LineString",
+        "coordinates": [[2.3540, 48.8575], [2.3550, 48.8580]]
+      }
+    }
+  ]
+}
