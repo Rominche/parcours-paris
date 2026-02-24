@@ -1,5 +1,6 @@
 package com.parcoursparis.map
 
+import androidx.test.core.app.ApplicationProvider
 import com.parcoursparis.data.entity.Segment
 import com.parcoursparis.data.repository.FakeSegmentDao
 import com.parcoursparis.data.repository.FakeSegmentVisitDao
@@ -13,11 +14,16 @@ import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Rule
 import org.junit.Test
+import org.junit.runner.RunWith
+import org.robolectric.RobolectricTestRunner
+import org.robolectric.annotation.Config
 
 /**
  * Unit tests for MapViewModel.
  * Verifies segmentsWithExploredState is collected and exposed in MapUiState.
  */
+@RunWith(RobolectricTestRunner::class)
+@Config(sdk = [24])
 class MapViewModelTest {
 
     @get:Rule
@@ -33,7 +39,8 @@ class MapViewModelTest {
         segmentDao = FakeSegmentDao()
         segmentVisitDao = FakeSegmentVisitDao()
         repository = SegmentRepository(segmentDao, segmentVisitDao)
-        viewModel = MapViewModel(repository)
+        val app = ApplicationProvider.getApplicationContext<android.content.Context>()
+        viewModel = MapViewModel(repository, app.applicationContext as android.app.Application)
     }
 
     @Test

@@ -45,7 +45,7 @@ development_status:
   1-2-pipeline-osm-et-couche-donnees: done
   1-3-affichage-carte-avec-pan-et-zoom: done
   1-4-couche-segments-colores-avec-lod: done
-  1-5-position-gps-et-gestion-permissions: backlog
+  1-5-position-gps-et-gestion-permissions: done
   epic-1-retrospective: optional
 
   epic-2: backlog

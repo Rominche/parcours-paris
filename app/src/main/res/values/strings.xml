@@ -4,4 +4,8 @@
     <string name="map_content_description">Carte interactive de Paris avec pan et zoom</string>
     <string name="map_load_error">Carte non chargée</string>
     <string name="map_segments_error">Erreur de chargement des segments</string>
+    <string name="location_permission_rationale">La localisation permet d\'afficher votre position sur la carte pour suivre vos déplacements.</string>
+    <string name="location_permission_denied">Position non affichée : la permission de localisation a été refusée.</string>
+    <string name="permission_dialog_confirm_button">Continuer</string>
+    <string name="permission_dialog_deny_button">Refuser</string>
 </resources>
