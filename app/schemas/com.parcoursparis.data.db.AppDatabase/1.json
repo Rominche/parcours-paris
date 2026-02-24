@@ -1,0 +1,85 @@
+{
+  "formatVersion": 1,
+  "database": {
+    "version": 1,
+    "identityHash": "c0cfa8427d760ce06f1912d6b259918c",
+    "entities": [
+      {
+        "tableName": "segment",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`osm_way_id` INTEGER NOT NULL, `geometry_json` TEXT NOT NULL, PRIMARY KEY(`osm_way_id`))",
+        "fields": [
+          {
+            "fieldPath": "osm_way_id",
+            "columnName": "osm_way_id",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "geometry_json",
+            "columnName": "geometry_json",
+            "affinity": "TEXT",
+            "notNull": true
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": false,
+          "columnNames": [
+            "osm_way_id"
+          ]
+        }
+      },
+      {
+        "tableName": "segment_visit",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`segment_id` INTEGER NOT NULL, `explored_at` INTEGER NOT NULL, PRIMARY KEY(`segment_id`), FOREIGN KEY(`segment_id`) REFERENCES `segment`(`osm_way_id`) ON UPDATE NO ACTION ON DELETE CASCADE )",
+        "fields": [
+          {
+            "fieldPath": "segment_id",
+            "columnName": "segment_id",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "explored_at",
+            "columnName": "explored_at",
+            "affinity": "INTEGER",
+            "notNull": true
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": false,
+          "columnNames": [
+            "segment_id"
+          ]
+        },
+        "indices": [
+          {
+            "name": "index_segment_visit_segment_id",
+            "unique": false,
+            "columnNames": [
+              "segment_id"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_segment_visit_segment_id` ON `${TABLE_NAME}` (`segment_id`)"
+          }
+        ],
+        "foreignKeys": [
+          {
+            "table": "segment",
+            "onDelete": "CASCADE",
+            "onUpdate": "NO ACTION",
+            "columns": [
+              "segment_id"
+            ],
+            "referencedColumns": [
+              "osm_way_id"
+            ]
+          }
+        ]
+      }
+    ],
+    "setupQueries": [
+      "CREATE TABLE IF NOT EXISTS room_master_table (id INTEGER PRIMARY KEY,identity_hash TEXT)",
+      "INSERT OR REPLACE INTO room_master_table (id,identity_hash) VALUES(42, 'c0cfa8427d760ce06f1912d6b259918c')"
+    ]
+  }
+}

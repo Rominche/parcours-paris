@@ -1,0 +1,33 @@
+---
+description: Workflow Git pour le développement BMAD - 1 branche et 1 commit par story
+alwaysApply: true
+---
+
+# Workflow Git - BMAD Implementation
+
+Lors du développement des stories (phase 4 BMAD), respecter strictement :
+
+## Branches
+
+- **1 branche par story** : `feature/{story-key}` (ex. `feature/1-1-creation-projet-android`)
+- Créer la branche **avant** de commencer le développement de la story
+- Nom de branche = story key en kebab-case (ex. `1-1-creation-projet-android`)
+
+## Commits
+
+- **1 seul commit par story** : regrouper toutes les modifications de la story dans un seul commit
+- **Message en français**, clair et concis
+- **Maximum 15 mots** pour le message de commit
+
+### Exemples de messages
+
+```
+Story 1.1 : création projet Android et structure de base
+Story 1.2 : pipeline OSM et couche données Room
+Story 2.1 : barre de recherche et géocodage
+```
+
+## Push
+
+- Push de la branche après chaque story terminée : `git push -u origin feature/{story-key}`
+- L'utilisateur crée la Pull Request sur GitHub après relecture

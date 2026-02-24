@@ -2,8 +2,6 @@ package com.parcoursparis
 
 import android.app.Application
 import android.util.Log
-import androidx.lifecycle.ProcessLifecycleOwner
-import androidx.lifecycle.lifecycleScope
 import androidx.room.Room
 import com.parcoursparis.data.GeoJsonLoader
 import com.parcoursparis.data.db.AppDatabase

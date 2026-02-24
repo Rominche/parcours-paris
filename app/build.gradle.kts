@@ -15,7 +15,8 @@ android {
         targetSdk = 35
         versionCode = 1
         versionName = "1.0"
-        
+        testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
+
         // Room schema export
         ksp {
             arg("room.schemaLocation", "$projectDir/schemas")
@@ -46,6 +47,7 @@ android {
 dependencies {
     implementation(libs.androidx.core.ktx)
     implementation(libs.androidx.lifecycle.runtime.ktx)
+    implementation(libs.androidx.lifecycle.viewmodel.compose)
     implementation(libs.androidx.activity.compose)
     implementation(platform(libs.androidx.compose.bom))
     implementation(libs.androidx.compose.ui)
@@ -73,4 +75,10 @@ dependencies {
     testImplementation("androidx.room:room-testing:2.8.4")
     testImplementation("org.robolectric:robolectric:4.13")
     testImplementation("androidx.test:core:1.6.1")
+    testImplementation("androidx.compose.ui:ui-test-junit4")
+    androidTestImplementation(platform(libs.androidx.compose.bom))
+    androidTestImplementation("androidx.compose.ui:ui-test-junit4")
+    androidTestImplementation("androidx.test.ext:junit:1.2.1")
+    androidTestImplementation("androidx.test.espresso:espresso-core:3.6.1")
+    androidTestImplementation("androidx.test:runner:1.6.2")
 }
