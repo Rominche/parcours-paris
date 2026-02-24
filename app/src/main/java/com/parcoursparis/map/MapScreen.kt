@@ -1,15 +1,25 @@
 package com.parcoursparis.map
 
+import android.Manifest
+import android.content.pm.PackageManager
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
@@ -18,20 +28,87 @@ import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.testTag
 import androidx.compose.ui.unit.dp
+import androidx.core.content.ContextCompat
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.parcoursparis.ParcoursParisApplication
 import com.parcoursparis.R
 
 @Composable
 fun MapScreen() {
-    val repository = (LocalContext.current.applicationContext as ParcoursParisApplication).segmentRepository
-    val viewModel: MapViewModel = viewModel(factory = MapViewModelFactory(repository))
+    val context = LocalContext.current
+    val appContext = context.applicationContext as ParcoursParisApplication
+    val repository = appContext.segmentRepository
+    val viewModel: MapViewModel = viewModel(
+        factory = MapViewModelFactory(repository, appContext)
+    )
     val uiState by viewModel.uiState.collectAsState()
     val mapContentDesc = stringResource(R.string.map_content_description)
+    var showRationaleDialog by remember { mutableStateOf(false) }
+
+    val permissionLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.RequestMultiplePermissions()
+    ) { permissions ->
+        val granted = permissions[Manifest.permission.ACCESS_FINE_LOCATION] == true
+            || permissions[Manifest.permission.ACCESS_COARSE_LOCATION] == true
+        viewModel.onLocationPermissionResult(granted)
+    }
+
+    LaunchedEffect(Unit) {
+        val hasPermission = ContextCompat.checkSelfPermission(
+            context,
+            Manifest.permission.ACCESS_FINE_LOCATION
+        ) == PackageManager.PERMISSION_GRANTED
+            || ContextCompat.checkSelfPermission(
+                context,
+                Manifest.permission.ACCESS_COARSE_LOCATION
+            ) == PackageManager.PERMISSION_GRANTED
+        if (hasPermission) {
+            viewModel.onLocationPermissionResult(true)
+        } else {
+            showRationaleDialog = true
+        }
+    }
+
+    if (showRationaleDialog) {
+        AlertDialog(
+            onDismissRequest = {
+                showRationaleDialog = false
+                viewModel.onLocationPermissionResult(false)
+            },
+            text = {
+                Text(
+                    text = stringResource(R.string.location_permission_rationale),
+                    style = MaterialTheme.typography.bodyMedium
+                )
+            },
+            confirmButton = {
+                TextButton(onClick = {
+                    showRationaleDialog = false
+                    permissionLauncher.launch(
+                        arrayOf(
+                            Manifest.permission.ACCESS_FINE_LOCATION,
+                            Manifest.permission.ACCESS_COARSE_LOCATION
+                        )
+                    )
+                }) {
+                    Text(stringResource(R.string.permission_dialog_confirm_button))
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = {
+                    showRationaleDialog = false
+                    viewModel.onLocationPermissionResult(false)
+                }) {
+                    Text(stringResource(R.string.permission_dialog_deny_button))
+                }
+            }
+        )
+    }
 
     Box(modifier = Modifier.fillMaxSize()) {
         MapLibreMap(
             segments = uiState.segments,
+            userLocation = uiState.userLocation,
             modifier = Modifier
                 .fillMaxSize()
                 .semantics {
@@ -51,6 +128,22 @@ fun MapScreen() {
                 Text(
                     text = stringResource(R.string.map_segments_error),
                     color = MaterialTheme.colorScheme.onErrorContainer,
+                    style = MaterialTheme.typography.bodyMedium
+                )
+            }
+        }
+        if (uiState.locationPermissionDenied) {
+            Box(
+                modifier = Modifier
+                    .align(Alignment.TopCenter)
+                    .fillMaxWidth()
+                    .background(MaterialTheme.colorScheme.surfaceVariant)
+                    .padding(horizontal = 16.dp, vertical = 12.dp),
+                contentAlignment = Alignment.Center
+            ) {
+                Text(
+                    text = stringResource(R.string.location_permission_denied),
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
                     style = MaterialTheme.typography.bodyMedium
                 )
             }

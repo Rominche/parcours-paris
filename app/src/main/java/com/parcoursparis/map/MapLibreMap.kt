@@ -24,11 +24,14 @@ import org.maplibre.android.geometry.LatLng
 import org.maplibre.android.maps.MapView
 import org.maplibre.android.maps.Style
 import org.maplibre.android.style.expressions.Expression
+import org.maplibre.android.style.layers.CircleLayer
 import org.maplibre.android.style.layers.LineLayer
 import org.maplibre.android.style.layers.PropertyFactory
 import org.maplibre.android.style.sources.GeoJsonSource
 
 private const val TAG = "MapLibreMap"
+private const val USER_LOCATION_SOURCE_ID = "user-location-source"
+private const val USER_LOCATION_LAYER_ID = "user-location-layer"
 private const val PARIS_LAT = 48.8566
 private const val PARIS_LON = 2.3522
 private const val PARIS_ZOOM = 11.5
@@ -49,13 +52,17 @@ private const val LOD_DETAIL_MIN_ZOOM = 12f
 @Composable
 fun MapLibreMap(
     segments: List<SegmentWithExploredState>,
+    userLocation: org.maplibre.android.geometry.LatLng? = null,
     modifier: Modifier = Modifier
 ) {
     val lifecycleOwner = LocalLifecycleOwner.current
     val mapViewState = remember { mutableStateOf<MapView?>(null) }
     val sourceRef = remember { mutableStateOf<GeoJsonSource?>(null) }
+    val locationSourceRef = remember { mutableStateOf<GeoJsonSource?>(null) }
     // HIGH-1: toujours accéder à la version la plus récente des segments dans les callbacks async
     val currentSegments = rememberUpdatedState(segments)
+    // Même pattern pour userLocation : accès à la dernière valeur dans le callback setStyle
+    val currentUserLocation = rememberUpdatedState(userLocation)
     // HIGH-2: scope pour lancer la conversion GeoJSON hors du main thread depuis setStyle
     val scope = rememberCoroutineScope()
 
@@ -102,6 +109,33 @@ fun MapLibreMap(
                         style.addLayer(exploredLayer)
                         style.addLayer(unexploredLayer)
 
+                        // User location: GeoJsonSource + CircleLayer for GPS dot
+                        val locationSource = GeoJsonSource(
+                            USER_LOCATION_SOURCE_ID,
+                            """{"type":"FeatureCollection","features":[]}"""
+                        )
+                        style.addSource(locationSource)
+                        locationSourceRef.value = locationSource
+                        // Appliquer immédiatement si une position GPS était déjà connue avant
+                        // le chargement du style (évite la race condition au démarrage)
+                        currentUserLocation.value?.let { loc ->
+                            locationSource.setGeoJson(
+                                """{"type":"FeatureCollection","features":[{"type":"Feature","geometry":{"type":"Point","coordinates":[${loc.longitude},${loc.latitude}]},"properties":{}}]}"""
+                            )
+                        }
+                        val locationLayer = CircleLayer(
+                            USER_LOCATION_LAYER_ID,
+                            USER_LOCATION_SOURCE_ID
+                        ).withProperties(
+                            PropertyFactory.circleRadius(8f),
+                            PropertyFactory.circleColor(
+                                android.graphics.Color.parseColor("#2196F3")
+                            ),
+                            PropertyFactory.circleStrokeWidth(2f),
+                            PropertyFactory.circleStrokeColor(android.graphics.Color.WHITE)
+                        )
+                        style.addLayer(locationLayer)
+
                         // HIGH-1 + HIGH-2: conversion hors main thread avec données les plus récentes
                         scope.launch {
                             val geoJson = withContext(Dispatchers.Default) {
@@ -119,6 +153,17 @@ fun MapLibreMap(
         sourceRef.value?.let { source ->
             val geoJson = withContext(Dispatchers.Default) {
                 SegmentGeoJsonConverter.toFeatureCollectionJson(segments)
+            }
+            source.setGeoJson(geoJson)
+        }
+    }
+
+    LaunchedEffect(userLocation) {
+        locationSourceRef.value?.let { source ->
+            val geoJson = if (userLocation != null) {
+                """{"type":"FeatureCollection","features":[{"type":"Feature","geometry":{"type":"Point","coordinates":[${userLocation.longitude},${userLocation.latitude}]},"properties":{}}]}"""
+            } else {
+                """{"type":"FeatureCollection","features":[]}"""
             }
             source.setGeoJson(geoJson)
         }
@@ -144,6 +189,7 @@ fun MapLibreMap(
             }
             mapViewState.value = null
             sourceRef.value = null
+            locationSourceRef.value = null
         }
     }
 }
