@@ -5,3 +5,15 @@ plugins {
     alias(libs.plugins.kotlin.android) apply false
     alias(libs.plugins.ksp) apply false
 }
+
+// Fix Room + kotlinx.serialization : Room schema export requiert kotlinx.serialization >= 1.8.0
+subprojects {
+    configurations.all {
+        resolutionStrategy.eachDependency {
+            if (requested.group == "org.jetbrains.kotlinx" && requested.name.startsWith("kotlinx-serialization")) {
+                useVersion("1.8.0")
+                because("Room schema export requires kotlinx.serialization >= 1.8.0 (AbstractMethodError fix)")
+            }
+        }
+    }
+}

@@ -11,6 +11,8 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.launch
+import org.maplibre.android.MapLibre
+import org.maplibre.android.WellKnownTileServer
 import java.io.FileNotFoundException
 
 class ParcoursParisApplication : Application() {
@@ -36,6 +38,9 @@ class ParcoursParisApplication : Application() {
 
     override fun onCreate() {
         super.onCreate()
+        // MapLibre must be initialized before any MapView is created (required by SDK 12+).
+        // Empty API key is valid for public tiles (e.g. demotiles.maplibre.org).
+        MapLibre.getInstance(applicationContext, "", WellKnownTileServer.MAPLIBRE)
         applicationScope.launch {
             loadSegmentsIfNeeded()
         }
