@@ -40,7 +40,7 @@ class ParcoursParisApplication : Application() {
         super.onCreate()
         // MapLibre must be initialized before any MapView is created (required by SDK 12+).
         // Empty API key is valid for public tiles (e.g. demotiles.maplibre.org).
-        MapLibre.getInstance(applicationContext, "", WellKnownTileServer.MAPLIBRE)
+        MapLibre.getInstance(applicationContext, "", WellKnownTileServer.MapLibre)
         applicationScope.launch {
             loadSegmentsIfNeeded()
         }
