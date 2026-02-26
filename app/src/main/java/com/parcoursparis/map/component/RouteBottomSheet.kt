@@ -1,5 +1,6 @@
 package com.parcoursparis.map.component
 
+import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -21,6 +22,7 @@ import com.parcoursparis.ui.component.ToleranceSlider
 /**
  * Bottom sheet affichant ETA, distance, progression, ToleranceSlider et choix découverte/classique.
  */
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun RouteBottomSheet(
     route: RouteResult,

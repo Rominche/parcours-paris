@@ -58,6 +58,7 @@ fun MapScreen() {
     )
     val uiState by viewModel.uiState.collectAsState()
     val mapContentDesc = stringResource(R.string.map_content_description)
+    val routeComputeButtonDesc = stringResource(R.string.route_compute_button)
     var showRationaleDialog by remember { mutableStateOf(false) }
 
     val permissionLauncher = rememberLauncherForActivityResult(
@@ -208,7 +209,7 @@ fun MapScreen() {
                     .padding(16.dp)
                     .semantics {
                         testTag = "route_compute_fab"
-                        contentDescription = stringResource(R.string.route_compute_button)
+                        contentDescription = routeComputeButtonDesc
                     },
                 content = {
                     if (uiState.isComputingRoute) {
@@ -220,7 +221,7 @@ fun MapScreen() {
                     } else {
                         Icon(
                             imageVector = Icons.Default.Directions,
-                            contentDescription = stringResource(R.string.route_compute_button)
+                            contentDescription = routeComputeButtonDesc
                         )
                     }
                 }

@@ -18,7 +18,7 @@
     <string name="tolerance_label">Surplus temps max : %d %%</string>
     <string name="route_eta_format">~%d min</string>
     <string name="route_distance_format">%.1f km</string>
-    <string name="route_progress_format">%d %% parcouru · ~%s restants</string>
+    <string name="route_progress_format" formatted="false">%1$d %% parcouru · ~%2$s restants</string>
     <string name="route_progress_meters">%.0f m</string>
     <string name="route_progress_km">%.1f km</string>
     <string name="route_bottom_sheet_title">Itinéraire</string>
