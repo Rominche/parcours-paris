@@ -48,11 +48,11 @@ development_status:
   1-5-position-gps-et-gestion-permissions: done
   epic-1-retrospective: optional
 
-  epic-2: backlog
-  2-1-barre-recherche-et-geocodage: backlog
-  2-2-moteur-routing-oriente-decouverte: backlog
-  2-3-affichage-itineraire-et-parametre-tolerance: backlog
-  2-4-suivi-itineraire-et-fallback-classique: backlog
+  epic-2: in-progress
+  2-1-barre-recherche-et-geocodage: done
+  2-2-moteur-routing-oriente-decouverte: done
+  2-3-affichage-itineraire-et-parametre-tolerance: done
+  2-4-suivi-itineraire-et-fallback-classique: done
   epic-2-retrospective: optional
 
   epic-3: backlog

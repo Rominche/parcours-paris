@@ -16,6 +16,7 @@ import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import com.parcoursparis.R
 import com.parcoursparis.data.repository.SegmentWithExploredState
+import com.parcoursparis.routing.RouteResult
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -37,11 +38,14 @@ private const val PARIS_LON = 2.3522
 private const val PARIS_ZOOM = 11.5
 private const val MAPLIBRE_STYLE_URL = "https://demotiles.maplibre.org/style.json"
 private const val SEGMENTS_SOURCE_ID = "parcours-segments"
+private const val ROUTE_SOURCE_ID = "route-source"
+private const val ROUTE_LAYER_ID = "route-layer"
 private const val COLOR_EXPLORED = "#4CAF50"
 private const val COLOR_UNEXPLORED = "#9E9E9E"
-// LOD: rues non-parcourues visibles seulement à zoom >= 12 (détail)
-// En dézoom, seuls les segments explorés (verts) restent visibles → aperçu de la progression
-private const val LOD_DETAIL_MIN_ZOOM = 12f
+private const val COLOR_ROUTE_ACCENT = "#2196F3"
+// LOD: rues non-parcourues visibles à partir de zoom 11 (légèrement en dessous du zoom par défaut 11.5)
+// En dézoom plus fort, seuls les segments explorés (verts) restent visibles → aperçu de la progression
+private const val LOD_DETAIL_MIN_ZOOM = 11f
 
 /**
  * Composable MapLibre map with pan, zoom, and colored segment layer.
@@ -49,20 +53,31 @@ private const val LOD_DETAIL_MIN_ZOOM = 12f
  * Segments: green (#4CAF50) for explored, grey (#9E9E9E) for unexplored.
  * Lifecycle: onStart/onStop/onDestroy managed via LocalLifecycleOwner.
  */
+/**
+ * Convertit RouteResult.geometry en GeoJSON LineString.
+ */
+private fun routeToGeoJsonLineString(route: RouteResult): String {
+    val coords = route.geometry.joinToString(",") { "[${it.longitude},${it.latitude}]" }
+    return """{"type":"LineString","coordinates":[$coords]}"""
+}
+
 @Composable
 fun MapLibreMap(
     segments: List<SegmentWithExploredState>,
     userLocation: org.maplibre.android.geometry.LatLng? = null,
+    route: RouteResult? = null,
     modifier: Modifier = Modifier
 ) {
     val lifecycleOwner = LocalLifecycleOwner.current
     val mapViewState = remember { mutableStateOf<MapView?>(null) }
     val sourceRef = remember { mutableStateOf<GeoJsonSource?>(null) }
+    val routeSourceRef = remember { mutableStateOf<GeoJsonSource?>(null) }
     val locationSourceRef = remember { mutableStateOf<GeoJsonSource?>(null) }
     // HIGH-1: toujours accéder à la version la plus récente des segments dans les callbacks async
     val currentSegments = rememberUpdatedState(segments)
     // Même pattern pour userLocation : accès à la dernière valeur dans le callback setStyle
     val currentUserLocation = rememberUpdatedState(userLocation)
+    val currentRoute = rememberUpdatedState(route)
     // HIGH-2: scope pour lancer la conversion GeoJSON hors du main thread depuis setStyle
     val scope = rememberCoroutineScope()
 
@@ -108,6 +123,22 @@ fun MapLibreMap(
                         unexploredLayer.setMinZoom(LOD_DETAIL_MIN_ZOOM)
                         style.addLayer(exploredLayer)
                         style.addLayer(unexploredLayer)
+
+                        // Route: GeoJsonSource + LineLayer (above segments, below userLocation)
+                        val routeSource = GeoJsonSource(ROUTE_SOURCE_ID, """{"type":"FeatureCollection","features":[]}""")
+                        style.addSource(routeSource)
+                        routeSourceRef.value = routeSource
+                        currentRoute.value?.let { r ->
+                            routeSource.setGeoJson(
+                                """{"type":"FeatureCollection","features":[{"type":"Feature","geometry":${routeToGeoJsonLineString(r)},"properties":{}}]}"""
+                            )
+                        }
+                        val routeLayer = LineLayer(ROUTE_LAYER_ID, ROUTE_SOURCE_ID)
+                            .withProperties(
+                                PropertyFactory.lineColor(android.graphics.Color.parseColor(COLOR_ROUTE_ACCENT)),
+                                PropertyFactory.lineWidth(4f)
+                            )
+                        style.addLayer(routeLayer)
 
                         // User location: GeoJsonSource + CircleLayer for GPS dot
                         val locationSource = GeoJsonSource(
@@ -169,6 +200,17 @@ fun MapLibreMap(
         }
     }
 
+    LaunchedEffect(route) {
+        routeSourceRef.value?.let { source ->
+            val geoJson = if (route != null) {
+                """{"type":"FeatureCollection","features":[{"type":"Feature","geometry":${routeToGeoJsonLineString(route)},"properties":{}}]}"""
+            } else {
+                """{"type":"FeatureCollection","features":[]}"""
+            }
+            source.setGeoJson(geoJson)
+        }
+    }
+
     DisposableEffect(lifecycleOwner) {
         val lifecycle = lifecycleOwner.lifecycle
         val observer = LifecycleEventObserver { _, event ->
@@ -189,6 +231,7 @@ fun MapLibreMap(
             }
             mapViewState.value = null
             sourceRef.value = null
+            routeSourceRef.value = null
             locationSourceRef.value = null
         }
     }

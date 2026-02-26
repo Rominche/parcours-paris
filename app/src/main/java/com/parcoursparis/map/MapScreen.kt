@@ -20,6 +20,12 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.foundation.layout.size
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Directions
+import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.FloatingActionButton
+import androidx.compose.material3.Icon
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
@@ -28,6 +34,9 @@ import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.testTag
 import androidx.compose.ui.unit.dp
+import com.parcoursparis.map.component.RouteBottomSheet
+import com.parcoursparis.map.component.SearchBar
+import kotlinx.coroutines.delay
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.parcoursparis.ParcoursParisApplication
@@ -39,7 +48,13 @@ fun MapScreen() {
     val appContext = context.applicationContext as ParcoursParisApplication
     val repository = appContext.segmentRepository
     val viewModel: MapViewModel = viewModel(
-        factory = MapViewModelFactory(repository, appContext)
+        factory = MapViewModelFactory(
+            repository,
+            appContext.geocodingService,
+            appContext.discoveryRoutingEngine,
+            appContext.userPreferences,
+            appContext
+        )
     )
     val uiState by viewModel.uiState.collectAsState()
     val mapContentDesc = stringResource(R.string.map_content_description)
@@ -51,6 +66,11 @@ fun MapScreen() {
         val granted = permissions[Manifest.permission.ACCESS_FINE_LOCATION] == true
             || permissions[Manifest.permission.ACCESS_COARSE_LOCATION] == true
         viewModel.onLocationPermissionResult(granted)
+    }
+
+    LaunchedEffect(uiState.searchQuery) {
+        delay(300)
+        viewModel.onSearchQuerySubmit(uiState.searchQuery)
     }
 
     LaunchedEffect(Unit) {
@@ -109,6 +129,7 @@ fun MapScreen() {
         MapLibreMap(
             segments = uiState.segments,
             userLocation = uiState.userLocation,
+            route = uiState.route,
             modifier = Modifier
                 .fillMaxSize()
                 .semantics {
@@ -116,6 +137,21 @@ fun MapScreen() {
                     contentDescription = mapContentDesc
                 }
         )
+        Box(
+            modifier = Modifier
+                .align(Alignment.TopCenter)
+                .fillMaxWidth()
+                .padding(16.dp)
+        ) {
+            SearchBar(
+                query = uiState.searchQuery,
+                onQueryChange = viewModel::onSearchQueryChange,
+                suggestions = uiState.searchSuggestions,
+                isSearching = uiState.isSearching,
+                searchError = uiState.searchError,
+                onSuggestionSelected = viewModel::onDestinationSelected
+            )
+        }
         if (uiState.error != null) {
             Box(
                 modifier = Modifier
@@ -147,6 +183,62 @@ fun MapScreen() {
                     style = MaterialTheme.typography.bodyMedium
                 )
             }
+        }
+        if (uiState.routeError != null) {
+            Box(
+                modifier = Modifier
+                    .align(Alignment.BottomCenter)
+                    .fillMaxWidth()
+                    .background(MaterialTheme.colorScheme.errorContainer)
+                    .padding(horizontal = 16.dp, vertical = 12.dp),
+                contentAlignment = Alignment.Center
+            ) {
+                Text(
+                    text = uiState.routeError!!,
+                    color = MaterialTheme.colorScheme.onErrorContainer,
+                    style = MaterialTheme.typography.bodyMedium
+                )
+            }
+        }
+        if (uiState.destination != null) {
+            FloatingActionButton(
+                onClick = { viewModel.onRequestRoute() },
+                modifier = Modifier
+                    .align(Alignment.BottomEnd)
+                    .padding(16.dp)
+                    .semantics {
+                        testTag = "route_compute_fab"
+                        contentDescription = stringResource(R.string.route_compute_button)
+                    },
+                content = {
+                    if (uiState.isComputingRoute) {
+                        CircularProgressIndicator(
+                            modifier = Modifier.size(24.dp),
+                            strokeWidth = 2.dp,
+                            color = MaterialTheme.colorScheme.onPrimaryContainer
+                        )
+                    } else {
+                        Icon(
+                            imageVector = Icons.Default.Directions,
+                            contentDescription = stringResource(R.string.route_compute_button)
+                        )
+                    }
+                }
+            )
+        }
+        if (uiState.route != null && uiState.showRouteBottomSheet) {
+            RouteBottomSheet(
+                route = uiState.route!!,
+                tolerancePercent = uiState.tolerancePercent,
+                routeProgressPercent = uiState.routeProgressPercent,
+                distanceRemainingMeters = uiState.distanceRemainingMeters,
+                hasDiscoveryRoute = uiState.discoveryRoute != null,
+                hasClassicRoute = uiState.classicRoute != null,
+                onToleranceChange = viewModel::onToleranceChanged,
+                onRequestClassicRoute = viewModel::onRequestClassicRoute,
+                onRequestDiscoveryRoute = viewModel::onRequestDiscoveryRoute,
+                onDismissRequest = viewModel::onDismissRouteBottomSheet
+            )
         }
     }
 }

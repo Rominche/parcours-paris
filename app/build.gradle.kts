@@ -64,6 +64,12 @@ dependencies {
     // MapLibre 12.3.1
     implementation(libs.maplibre.android.sdk)
 
+    // OkHttp (geocoding Nominatim)
+    implementation(libs.okhttp)
+
+    // DataStore Preferences (tolerance persistence)
+    implementation(libs.androidx.datastore.preferences)
+
     // Compose Navigation
     implementation(libs.androidx.navigation.compose)
 
@@ -76,6 +82,7 @@ dependencies {
     testImplementation("org.robolectric:robolectric:4.13")
     testImplementation("androidx.test:core:1.6.1")
     testImplementation("androidx.compose.ui:ui-test-junit4")
+    testImplementation(libs.okhttp.mockwebserver)
     androidTestImplementation(platform(libs.androidx.compose.bom))
     androidTestImplementation("androidx.compose.ui:ui-test-junit4")
     androidTestImplementation("androidx.test.ext:junit:1.2.1")
