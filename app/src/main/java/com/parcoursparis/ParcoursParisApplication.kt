@@ -6,6 +6,10 @@ import androidx.room.Room
 import com.parcoursparis.data.GeoJsonLoader
 import com.parcoursparis.data.db.AppDatabase
 import com.parcoursparis.data.repository.SegmentRepository
+import com.parcoursparis.map.geocoding.GeocodingService
+import com.parcoursparis.map.geocoding.NominatimGeocodingService
+import com.parcoursparis.routing.DiscoveryRoutingEngine
+import com.parcoursparis.routing.DiscoveryRoutingEngineImpl
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -32,6 +36,14 @@ class ParcoursParisApplication : Application() {
             segmentDao = database.segmentDao(),
             segmentVisitDao = database.segmentVisitDao()
         )
+    }
+
+    val geocodingService: GeocodingService by lazy {
+        NominatimGeocodingService()
+    }
+
+    val discoveryRoutingEngine: DiscoveryRoutingEngine by lazy {
+        DiscoveryRoutingEngineImpl()
     }
 
     private val applicationScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)

@@ -8,4 +8,11 @@
     <string name="location_permission_denied">Position non affichée : la permission de localisation a été refusée.</string>
     <string name="permission_dialog_confirm_button">Continuer</string>
     <string name="permission_dialog_deny_button">Refuser</string>
+    <string name="search_placeholder">Adresse ou lieu</string>
+    <string name="search_offline_message">Connectez-vous pour rechercher une adresse</string>
+    <string name="route_compute_button">Calculer itinéraire</string>
+    <string name="route_computing">Calcul en cours…</string>
+    <string name="route_error_no_destination">Aucune destination définie</string>
+    <string name="route_error_no_position">Position non disponible</string>
+    <string name="route_error_no_path">Aucun chemin trouvé</string>
 </resources>

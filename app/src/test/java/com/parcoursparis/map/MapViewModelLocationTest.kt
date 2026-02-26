@@ -8,6 +8,8 @@ import com.parcoursparis.data.entity.Segment
 import com.parcoursparis.data.repository.FakeSegmentDao
 import com.parcoursparis.data.repository.FakeSegmentVisitDao
 import com.parcoursparis.data.repository.SegmentRepository
+import com.parcoursparis.map.geocoding.FakeGeocodingService
+import com.parcoursparis.routing.FakeDiscoveryRoutingEngine
 import com.parcoursparis.util.MainDispatcherRule
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.runBlocking
@@ -45,7 +47,12 @@ class MapViewModelLocationTest {
         segmentVisitDao = FakeSegmentVisitDao()
         repository = SegmentRepository(segmentDao, segmentVisitDao)
         val context = ApplicationProvider.getApplicationContext<Context>()
-        viewModel = MapViewModel(repository, context.applicationContext as android.app.Application)
+        viewModel = MapViewModel(
+            repository,
+            FakeGeocodingService(),
+            FakeDiscoveryRoutingEngine(),
+            context.applicationContext as android.app.Application
+        )
         runBlocking {
             segmentDao.insertAll(listOf(Segment(1001L, "[[2.35,48.85],[2.36,48.86]]")))
         }
