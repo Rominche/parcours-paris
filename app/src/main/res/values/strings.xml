@@ -8,4 +8,20 @@
     <string name="location_permission_denied">Position non affichée : la permission de localisation a été refusée.</string>
     <string name="permission_dialog_confirm_button">Continuer</string>
     <string name="permission_dialog_deny_button">Refuser</string>
+    <string name="search_placeholder">Adresse ou lieu</string>
+    <string name="search_offline_message">Connectez-vous pour rechercher une adresse</string>
+    <string name="route_compute_button">Calculer itinéraire</string>
+    <string name="route_computing">Calcul en cours…</string>
+    <string name="route_error_no_destination">Aucune destination définie</string>
+    <string name="route_error_no_position">Position non disponible</string>
+    <string name="route_error_no_path">Aucun chemin trouvé</string>
+    <string name="tolerance_label">Surplus temps max : %d %%</string>
+    <string name="route_eta_format">~%d min</string>
+    <string name="route_distance_format">%.1f km</string>
+    <string name="route_progress_format">%d %% parcouru · ~%s restants</string>
+    <string name="route_progress_meters">%.0f m</string>
+    <string name="route_progress_km">%.1f km</string>
+    <string name="route_bottom_sheet_title">Itinéraire</string>
+    <string name="route_button_classic">Chemin rapide</string>
+    <string name="route_button_discovery">Chemin découverte</string>
 </resources>
