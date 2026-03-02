@@ -185,6 +185,7 @@ class MapViewModel(
         _uiState.update {
             it.copy(
                 destination = null,
+                originOverride = null,
                 searchSuggestions = emptyList(),
                 searchError = null,
                 route = null,
@@ -193,6 +194,19 @@ class MapViewModel(
                 routeError = null,
                 showRouteBottomSheet = false,
                 usedParisAsFallback = false
+            )
+        }
+    }
+
+    /** Appelé quand l'utilisateur revient de la page de recherche avec destination (et optionnellement origine). */
+    fun onAddressSearchResult(destination: LatLng, originOverride: LatLng?) {
+        _uiState.update {
+            it.copy(
+                destination = destination,
+                originOverride = originOverride,
+                searchQuery = "",
+                searchSuggestions = emptyList(),
+                searchError = null
             )
         }
     }
@@ -240,7 +254,7 @@ class MapViewModel(
     fun onRequestRoute(useParisAsFallback: Boolean = false) {
         val state = _uiState.value
         val dest = state.destination
-        var origin = state.userLocation
+        var origin = state.originOverride ?: state.userLocation
         val segments = state.segments
         val useFallback = useParisAsFallback || (origin == null && state.usedParisAsFallback)
 

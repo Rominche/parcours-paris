@@ -148,7 +148,8 @@ class DiscoveryRoutingEngineImpl : DiscoveryRoutingEngine {
         pq.add(origin to 0.0)
 
         while (pq.isNotEmpty()) {
-            val (u, d) = pq.poll()
+            val polled = pq.poll() ?: break
+            val (u, d) = polled
             if (d > dist.getValue(u)) continue
             if (u == dest) break
 
@@ -189,7 +190,8 @@ class DiscoveryRoutingEngineImpl : DiscoveryRoutingEngine {
         pq.add(NodeState(origin, 0.0, 0.0))
 
         while (pq.isNotEmpty()) {
-            val (u, dCost, uDist) = pq.poll()
+            val polled = pq.poll() ?: break
+            val (u, dCost, uDist) = polled
             if (dCost > bestCost.getValue(u)) continue
             if (uDist > maxAllowedDistance) continue
             if (u == dest) break

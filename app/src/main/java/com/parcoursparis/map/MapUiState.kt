@@ -17,6 +17,8 @@ data class MapUiState(
     val locationPermissionGranted: Boolean = false,
     val locationPermissionDenied: Boolean = false,
     val destination: LatLng? = null,
+    /** Position de départ explicite (recherche utilisateur). Si null, on utilise userLocation ou Paris. */
+    val originOverride: LatLng? = null,
     val searchQuery: String = "",
     val searchSuggestions: List<GeocodingResult> = emptyList(),
     val isSearching: Boolean = false,

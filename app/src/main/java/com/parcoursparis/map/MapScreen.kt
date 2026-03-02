@@ -5,8 +5,11 @@ import android.content.pm.PackageManager
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
@@ -24,6 +27,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.foundation.layout.size
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Directions
+import androidx.compose.material.icons.filled.Search
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.Icon
@@ -35,16 +39,18 @@ import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.testTag
 import androidx.compose.ui.unit.dp
+import androidx.navigation.NavController
+import com.parcoursparis.map.ADDRESS_SEARCH_RESULT
 import com.parcoursparis.map.component.RouteBottomSheet
-import com.parcoursparis.map.component.SearchBar
-import kotlinx.coroutines.delay
+import com.parcoursparis.navigation.NavRoutes
+import org.maplibre.android.geometry.LatLng
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.parcoursparis.ParcoursParisApplication
 import com.parcoursparis.R
 
 @Composable
-fun MapScreen() {
+fun MapScreen(navController: NavController) {
     val context = LocalContext.current
     val appContext = context.applicationContext as ParcoursParisApplication
     val repository = appContext.segmentRepository
@@ -68,11 +74,6 @@ fun MapScreen() {
         val granted = permissions[Manifest.permission.ACCESS_FINE_LOCATION] == true
             || permissions[Manifest.permission.ACCESS_COARSE_LOCATION] == true
         viewModel.onLocationPermissionResult(granted)
-    }
-
-    LaunchedEffect(uiState.searchQuery) {
-        delay(300)
-        viewModel.onSearchQuerySubmit(uiState.searchQuery)
     }
 
     LaunchedEffect(Unit) {
@@ -145,14 +146,46 @@ fun MapScreen() {
                 .fillMaxWidth()
                 .padding(16.dp)
         ) {
-            SearchBar(
-                query = uiState.searchQuery,
-                onQueryChange = viewModel::onSearchQueryChange,
-                suggestions = uiState.searchSuggestions,
-                isSearching = uiState.isSearching,
-                searchError = uiState.searchError,
-                onSuggestionSelected = viewModel::onDestinationSelected
-            )
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clickable { navController.navigate(NavRoutes.ADDRESS_SEARCH) }
+                    .background(
+                        MaterialTheme.colorScheme.surface,
+                        MaterialTheme.shapes.medium
+                    )
+                    .padding(horizontal = 16.dp, vertical = 14.dp),
+                verticalAlignment = androidx.compose.ui.Alignment.CenterVertically
+            ) {
+                Icon(
+                    imageVector = Icons.Default.Search,
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+                Spacer(modifier = Modifier.size(12.dp))
+                Text(
+                    text = stringResource(R.string.address_search_button),
+                    style = MaterialTheme.typography.bodyLarge,
+                    color = MaterialTheme.colorScheme.onSurface
+                )
+            }
+        }
+        LaunchedEffect(Unit) {
+            val backStackEntry = navController.currentBackStackEntry
+                ?: navController.getBackStackEntry(NavRoutes.MAP)
+            backStackEntry.savedStateHandle.getStateFlow(ADDRESS_SEARCH_RESULT, null)
+                .collect { result: String? ->
+                    result?.let { str ->
+                        val parts = str.split(",")
+                        if (parts.size >= 2) {
+                            val dest = LatLng(parts[0].toDouble(), parts[1].toDouble())
+                            val origin = if (parts.size >= 4) {
+                                LatLng(parts[2].toDouble(), parts[3].toDouble())
+                            } else null
+                            viewModel.onAddressSearchResult(dest, origin)
+                        }
+                    }
+                }
         }
         if (uiState.error != null) {
             Box(
