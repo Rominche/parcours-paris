@@ -2,16 +2,24 @@ package com.parcoursparis.map
 
 import android.util.Log
 import android.widget.Toast
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.padding
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.getValue
 import androidx.compose.runtime.rememberUpdatedState
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.unit.dp
 import androidx.compose.ui.platform.LocalLifecycleOwner
 import androidx.compose.ui.viewinterop.AndroidView
+import com.parcoursparis.map.component.ScaleBarOverlay
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import com.parcoursparis.R
@@ -61,6 +69,9 @@ private fun routeToGeoJsonLineString(route: RouteResult): String {
     return """{"type":"LineString","coordinates":[$coords]}"""
 }
 
+/** État de la caméra pour l'échelle (zoom, latitude du centre). */
+data class CameraScaleState(val zoom: Double, val centerLat: Double)
+
 @Composable
 fun MapLibreMap(
     segments: List<SegmentWithExploredState>,
@@ -73,6 +84,9 @@ fun MapLibreMap(
     val sourceRef = remember { mutableStateOf<GeoJsonSource?>(null) }
     val routeSourceRef = remember { mutableStateOf<GeoJsonSource?>(null) }
     val locationSourceRef = remember { mutableStateOf<GeoJsonSource?>(null) }
+    var cameraScaleState by remember {
+        mutableStateOf<CameraScaleState?>(CameraScaleState(PARIS_ZOOM.toDouble(), PARIS_LAT.toDouble()))
+    }
     // HIGH-1: toujours accéder à la version la plus récente des segments dans les callbacks async
     val currentSegments = rememberUpdatedState(segments)
     // Même pattern pour userLocation : accès à la dernière valeur dans le callback setStyle
@@ -81,8 +95,9 @@ fun MapLibreMap(
     // HIGH-2: scope pour lancer la conversion GeoJSON hors du main thread depuis setStyle
     val scope = rememberCoroutineScope()
 
+    Box(modifier = modifier.fillMaxSize()) {
     AndroidView(
-        modifier = modifier,
+        modifier = Modifier.fillMaxSize(),
         factory = { ctx ->
             MapView(ctx).apply {
                 mapViewState.value = this
@@ -94,6 +109,13 @@ fun MapLibreMap(
                     onStart()
                 }
                 getMapAsync { map ->
+                    map.addOnCameraIdleListener {
+                        val pos = map.cameraPosition
+                        cameraScaleState = CameraScaleState(
+                            zoom = pos.zoom.toDouble(),
+                            centerLat = pos.target.latitude
+                        )
+                    }
                     map.setStyle(Style.Builder().fromUri(MAPLIBRE_STYLE_URL)) { style ->
                         map.cameraPosition = CameraPosition.Builder()
                             .target(LatLng(PARIS_LAT, PARIS_LON))
@@ -179,6 +201,14 @@ fun MapLibreMap(
             }
         }
     )
+        cameraScaleState?.let { state ->
+            ScaleBarOverlay(
+                zoom = state.zoom,
+                centerLatitude = state.centerLat,
+                modifier = Modifier.align(Alignment.BottomStart).padding(16.dp)
+            )
+        }
+    }
 
     LaunchedEffect(segments) {
         sourceRef.value?.let { source ->

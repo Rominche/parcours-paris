@@ -28,6 +28,18 @@ fun locationFlow(context: Context): Flow<Location?> = callbackFlow {
 
     if (provider != null) {
         try {
+            // Émet immédiatement la dernière position connue (évite "Position non disponible" au démarrage)
+            @Suppress("DEPRECATION")
+            var lastKnown = locationManager.getLastKnownLocation(provider)
+            if (lastKnown == null && provider != LocationManager.NETWORK_PROVIDER) {
+                lastKnown = locationManager.getLastKnownLocation(LocationManager.NETWORK_PROVIDER)
+            }
+            if (lastKnown == null && provider != LocationManager.GPS_PROVIDER) {
+                lastKnown = locationManager.getLastKnownLocation(LocationManager.GPS_PROVIDER)
+            }
+            if (lastKnown != null) {
+                trySend(lastKnown)
+            }
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
                 val request = android.location.LocationRequest.Builder(2000L)
                     .setMinUpdateDistanceMeters(5f)

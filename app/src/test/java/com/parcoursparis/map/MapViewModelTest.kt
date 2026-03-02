@@ -185,6 +185,30 @@ class MapViewModelTest {
     }
 
     @Test
+    fun onRequestRoute_noUserLocation_withParisFallback_computesRoute() = runTest {
+        val s1 = Segment(1001L, "[[2.35,48.85],[2.36,48.86]]")
+        segmentDao.insertAll(listOf(s1))
+        viewModel.uiState.first { !it.isLoading }
+        viewModel.onDestinationSelected(GeocodingResult("Paris", 48.86, 2.36, null))
+
+        val routeResult = RouteResult(
+            geometry = listOf(LatLng(48.8566, 2.3522), LatLng(48.86, 2.36)),
+            etaSeconds = 300L,
+            distanceMeters = 2500.0,
+            routeType = RouteType.DISCOVERY
+        )
+        fakeRoutingEngine.nextResult = routeResult
+
+        viewModel.onRequestRoute(useParisAsFallback = true)
+        advanceUntilIdle()
+
+        val uiState = viewModel.uiState.value
+        assertNotNull(uiState.route)
+        assertNull(uiState.routeError)
+        assertTrue(uiState.usedParisAsFallback)
+    }
+
+    @Test
     fun onRequestRoute_success_updatesRoute() = runTest {
         val s1 = Segment(1001L, "[[2.35,48.85],[2.36,48.86]]")
         segmentDao.insertAll(listOf(s1))
