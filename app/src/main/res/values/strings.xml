@@ -25,4 +25,10 @@
     <string name="route_bottom_sheet_title">Itinéraire</string>
     <string name="route_button_classic">Chemin rapide</string>
     <string name="route_button_discovery">Chemin découverte</string>
+    <string name="back">Retour</string>
+    <string name="address_search_title">Recherche d\'adresse</string>
+    <string name="address_search_departure_placeholder">Position de départ (optionnel)</string>
+    <string name="address_search_destination_placeholder">Destination</string>
+    <string name="address_search_confirm">Valider et calculer l\'itinéraire</string>
+    <string name="address_search_button">Où allez-vous ?</string>
 </resources>
