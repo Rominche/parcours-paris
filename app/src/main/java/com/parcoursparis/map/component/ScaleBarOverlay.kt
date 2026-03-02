@@ -47,28 +47,31 @@ fun ScaleBarOverlay(
     val widthPx = (distanceMeters / metersPerPixel).toFloat().coerceIn(20f, 150f)
     val widthDp = with(density) { widthPx.toDp() }
 
+    val surfaceColor = MaterialTheme.colorScheme.surface
+    val onSurfaceColor = MaterialTheme.colorScheme.onSurface
+
     Column(
         modifier = modifier
-            .background(MaterialTheme.colorScheme.surface.copy(alpha = 0.9f))
+            .background(surfaceColor.copy(alpha = 0.9f))
             .padding(horizontal = 8.dp, vertical = 6.dp)
     ) {
         Canvas(modifier = Modifier.width(widthDp).height(24.dp)) {
             val strokeWidth = 3f
             val y = 12f
             drawLine(
-                color = MaterialTheme.colorScheme.onSurface,
+                color = onSurfaceColor,
                 start = Offset(0f, y),
                 end = Offset(size.width, y),
                 strokeWidth = strokeWidth
             )
             drawLine(
-                color = MaterialTheme.colorScheme.onSurface,
+                color = onSurfaceColor,
                 start = Offset(0f, y - 4f),
                 end = Offset(0f, y + 4f),
                 strokeWidth = 2f
             )
             drawLine(
-                color = MaterialTheme.colorScheme.onSurface,
+                color = onSurfaceColor,
                 start = Offset(size.width, y - 4f),
                 end = Offset(size.width, y + 4f),
                 strokeWidth = 2f
@@ -77,7 +80,7 @@ fun ScaleBarOverlay(
         Text(
             text = label,
             style = MaterialTheme.typography.labelSmall,
-            color = MaterialTheme.colorScheme.onSurface
+            color = onSurfaceColor
         )
     }
 }
