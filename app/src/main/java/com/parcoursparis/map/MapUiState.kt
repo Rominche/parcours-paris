@@ -29,5 +29,7 @@ data class MapUiState(
     val routeProgressPercent: Int = 0,
     val distanceRemainingMeters: Double = 0.0,
     val discoveryRoute: RouteResult? = null,
-    val classicRoute: RouteResult? = null
+    val classicRoute: RouteResult? = null,
+    /** True si l'itinéraire a été calculé avec Paris comme fallback (position absente). */
+    val usedParisAsFallback: Boolean = false
 )

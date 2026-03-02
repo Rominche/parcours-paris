@@ -14,10 +14,11 @@ import java.io.IOException
 object GeoJsonLoader {
 
     private const val TAG = "GeoJsonLoader"
-    private const val PARIS_MIN_LAT = 48.8
-    private const val PARIS_MAX_LAT = 48.9
-    private const val PARIS_MIN_LON = 2.2
-    private const val PARIS_MAX_LON = 2.5
+    // Paris intra-muros (bbox élargie pour couvrir tout le territoire)
+    private const val PARIS_MIN_LAT = 48.815
+    private const val PARIS_MAX_LAT = 48.902
+    private const val PARIS_MIN_LON = 2.225
+    private const val PARIS_MAX_LON = 2.417
 
     /**
      * Charge paris_segments.geojson depuis assets et retourne la liste des Segment.

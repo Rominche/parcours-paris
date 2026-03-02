@@ -35,6 +35,9 @@ private val PARIS_BOUNDS = BoundingBox(
     maxLat = 48.92
 )
 
+/** Centre de Paris — fallback quand la position GPS n'est pas disponible (émulateur, intérieur). */
+private val PARIS_CENTER = LatLng(48.8566, 2.3522)
+
 /**
  * ViewModel for the map screen.
  * Collects segmentsWithExploredState from SegmentRepository and exposes MapUiState.
@@ -188,7 +191,8 @@ class MapViewModel(
                 discoveryRoute = null,
                 classicRoute = null,
                 routeError = null,
-                showRouteBottomSheet = false
+                showRouteBottomSheet = false,
+                usedParisAsFallback = false
             )
         }
     }
@@ -231,19 +235,26 @@ class MapViewModel(
     /**
      * Demande le calcul d'un itinéraire discovery (origine = position utilisateur, destination).
      * Gère : pas de position, pas de destination, aucun chemin trouvé.
+     * @param useParisAsFallback si true et position absente, utilise le centre de Paris (émulateur/démo)
      */
-    fun onRequestRoute() {
-        val dest = _uiState.value.destination
-        val origin = _uiState.value.userLocation
-        val segments = _uiState.value.segments
+    fun onRequestRoute(useParisAsFallback: Boolean = false) {
+        val state = _uiState.value
+        val dest = state.destination
+        var origin = state.userLocation
+        val segments = state.segments
+        val useFallback = useParisAsFallback || (origin == null && state.usedParisAsFallback)
 
         if (dest == null) {
             _uiState.update { it.copy(routeError = "Aucune destination définie") }
             return
         }
         if (origin == null) {
-            _uiState.update { it.copy(routeError = "Position non disponible") }
-            return
+            if (useFallback) {
+                origin = PARIS_CENTER
+            } else {
+                _uiState.update { it.copy(routeError = "Position non disponible") }
+                return
+            }
         }
 
         val tolerance = _uiState.value.tolerancePercent.toDouble()
@@ -284,7 +295,8 @@ class MapViewModel(
                             routeError = null,
                             showRouteBottomSheet = true,
                             routeProgressPercent = 0,
-                            distanceRemainingMeters = result.distanceMeters
+                            distanceRemainingMeters = result.distanceMeters,
+                            usedParisAsFallback = useFallback
                         )
                         updateRouteProgress(base)
                     }
