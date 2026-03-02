@@ -113,7 +113,7 @@ fun MapLibreMap(
                         val pos = map.cameraPosition
                         cameraScaleState = CameraScaleState(
                             zoom = pos.zoom.toDouble(),
-                            centerLat = pos.target.latitude
+                            centerLat = pos.target?.latitude ?: PARIS_LAT
                         )
                     }
                     map.setStyle(Style.Builder().fromUri(MAPLIBRE_STYLE_URL)) { style ->
