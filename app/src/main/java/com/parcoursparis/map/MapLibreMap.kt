@@ -44,7 +44,7 @@ private const val USER_LOCATION_LAYER_ID = "user-location-layer"
 private const val PARIS_LAT = 48.8566
 private const val PARIS_LON = 2.3522
 private const val PARIS_ZOOM = 11.5
-private const val MAPLIBRE_STYLE_URL = "https://demotiles.maplibre.org/style.json"
+private const val OSM_STYLE_URI = "asset://osm_style.json"
 private const val SEGMENTS_SOURCE_ID = "parcours-segments"
 private const val ROUTE_SOURCE_ID = "route-source"
 private const val ROUTE_LAYER_ID = "route-layer"
@@ -56,7 +56,7 @@ private const val COLOR_ROUTE_ACCENT = "#2196F3"
 private const val LOD_DETAIL_MIN_ZOOM = 11f
 
 /**
- * Composable MapLibre map with pan, zoom, and colored segment layer.
+ * Composable map with OpenStreetMap tiles, pan, zoom, and colored segment layer.
  * Paris center (48.8566, 2.3522), zoom 11-12.
  * Segments: green (#4CAF50) for explored, grey (#9E9E9E) for unexplored.
  * Lifecycle: onStart/onStop/onDestroy managed via LocalLifecycleOwner.
@@ -116,7 +116,7 @@ fun MapLibreMap(
                             centerLat = pos.target?.latitude ?: PARIS_LAT
                         )
                     }
-                    map.setStyle(Style.Builder().fromUri(MAPLIBRE_STYLE_URL)) { style ->
+                    map.setStyle(Style.Builder().fromUri(OSM_STYLE_URI)) { style ->
                         map.cameraPosition = CameraPosition.Builder()
                             .target(LatLng(PARIS_LAT, PARIS_LON))
                             .zoom(PARIS_ZOOM)
