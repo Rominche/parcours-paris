@@ -51,9 +51,10 @@ private const val ROUTE_LAYER_ID = "route-layer"
 private const val COLOR_EXPLORED = "#4CAF50"
 private const val COLOR_UNEXPLORED = "#9E9E9E"
 private const val COLOR_ROUTE_ACCENT = "#2196F3"
-// LOD: rues non-parcourues visibles à partir de zoom 11 (légèrement en dessous du zoom par défaut 11.5)
-// En dézoom plus fort, seuls les segments explorés (verts) restent visibles → aperçu de la progression
-private const val LOD_DETAIL_MIN_ZOOM = 11f
+// LOD segments non explorés (gris) : uniquement quand Paris remplit l'écran.
+// Trop dézoomé (périphérique visible) ou trop zoomé (vue « tuile » rue) → masqués.
+private const val LOD_UNEXPLORED_MIN_ZOOM = 12.0f
+private const val LOD_UNEXPLORED_MAX_ZOOM = 12.8f
 
 /**
  * Composable map with OpenStreetMap tiles, pan, zoom, and colored segment layer.
@@ -128,8 +129,8 @@ fun MapLibreMap(
                         style.addSource(source)
                         sourceRef.value = source
 
-                        // CRITIQUE-1 LOD: segments explorés (verts) visibles à tous niveaux de zoom
-                        // CRITIQUE-1 LOD: segments non explorés (gris) uniquement à zoom >= LOD_DETAIL_MIN_ZOOM
+                        // Segments explorés (verts) : tous niveaux de zoom
+                        // Segments non explorés (gris) : bande de zoom « Paris plein écran »
                         val exploredLayer = LineLayer("parcours-segments-explored", SEGMENTS_SOURCE_ID)
                             .withFilter(Expression.eq(Expression.get("isExplored"), Expression.literal(true)))
                             .withProperties(
@@ -142,7 +143,8 @@ fun MapLibreMap(
                                 PropertyFactory.lineColor(android.graphics.Color.parseColor(COLOR_UNEXPLORED)),
                                 PropertyFactory.lineWidth(2f)
                             )
-                        unexploredLayer.setMinZoom(LOD_DETAIL_MIN_ZOOM)
+                        unexploredLayer.setMinZoom(LOD_UNEXPLORED_MIN_ZOOM)
+                        unexploredLayer.setMaxZoom(LOD_UNEXPLORED_MAX_ZOOM)
                         style.addLayer(exploredLayer)
                         style.addLayer(unexploredLayer)
 
