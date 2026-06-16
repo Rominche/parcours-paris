@@ -5,7 +5,6 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.parcoursparis.data.preferences.UserPreferencesRepository
 import com.parcoursparis.data.repository.SegmentRepository
-import com.parcoursparis.data.repository.SegmentWithExploredState
 import com.parcoursparis.map.geocoding.BoundingBox
 import com.parcoursparis.map.geocoding.GeocodingNetworkException
 import com.parcoursparis.map.geocoding.GeocodingResult
@@ -84,6 +83,59 @@ class MapViewModel(
                         )
                     }
                 }
+        }
+        viewModelScope.launch {
+            segmentRepository.progressStats.collect { stats ->
+                _uiState.update { it.copy(progressStats = stats) }
+            }
+        }
+    }
+
+    private fun updateSegmentSelectionEnabled(state: MapUiState): MapUiState {
+        val enabled = state.destination == null && state.route == null
+        return if (enabled) {
+            state.copy(isSegmentSelectionEnabled = true)
+        } else {
+            state.copy(
+                isSegmentSelectionEnabled = false,
+                selectedSegmentId = null
+            )
+        }
+    }
+
+    /**
+     * Appelé au tap sur la carte : sélectionne le segment le plus proche si le marquage est actif.
+     */
+    fun onMapTap(latLng: LatLng, zoom: Double) {
+        val state = _uiState.value
+        if (!state.isSegmentSelectionEnabled || state.segments.isEmpty()) return
+        val tolerance = SegmentSelectionUtils.touchToleranceMeters(zoom, latLng.latitude)
+        val nearest = SegmentSelectionUtils.findNearestSegment(
+            tapLat = latLng.latitude,
+            tapLon = latLng.longitude,
+            segments = state.segments,
+            maxDistanceMeters = tolerance
+        )
+        _uiState.update {
+            it.copy(selectedSegmentId = nearest?.segment?.osm_way_id)
+        }
+    }
+
+    fun onClearSegmentSelection() {
+        _uiState.update { it.copy(selectedSegmentId = null) }
+    }
+
+    fun onMarkSelectedExplored() {
+        val segmentId = _uiState.value.selectedSegmentId ?: return
+        viewModelScope.launch {
+            segmentRepository.markAsExplored(segmentId, System.currentTimeMillis())
+        }
+    }
+
+    fun onMarkSelectedUnexplored() {
+        val segmentId = _uiState.value.selectedSegmentId ?: return
+        viewModelScope.launch {
+            segmentRepository.markAsUnexplored(segmentId)
         }
     }
 
@@ -171,11 +223,13 @@ class MapViewModel(
     /** Called when user selects a suggestion; sets destination and clears suggestions. */
     fun onDestinationSelected(result: GeocodingResult) {
         _uiState.update {
-            it.copy(
-                destination = result.toLatLng(),
-                searchSuggestions = emptyList(),
-                searchQuery = result.label,
-                searchError = null
+            updateSegmentSelectionEnabled(
+                it.copy(
+                    destination = result.toLatLng(),
+                    searchSuggestions = emptyList(),
+                    searchQuery = result.label,
+                    searchError = null
+                )
             )
         }
     }
@@ -183,17 +237,19 @@ class MapViewModel(
     /** Clears destination and search state (e.g. when clearing the field). */
     fun onClearDestination() {
         _uiState.update {
-            it.copy(
-                destination = null,
-                originOverride = null,
-                searchSuggestions = emptyList(),
-                searchError = null,
-                route = null,
-                discoveryRoute = null,
-                classicRoute = null,
-                routeError = null,
-                showRouteBottomSheet = false,
-                usedParisAsFallback = false
+            updateSegmentSelectionEnabled(
+                it.copy(
+                    destination = null,
+                    originOverride = null,
+                    searchSuggestions = emptyList(),
+                    searchError = null,
+                    route = null,
+                    discoveryRoute = null,
+                    classicRoute = null,
+                    routeError = null,
+                    showRouteBottomSheet = false,
+                    usedParisAsFallback = false
+                )
             )
         }
     }
@@ -201,12 +257,14 @@ class MapViewModel(
     /** Appelé quand l'utilisateur revient de la page de recherche avec destination (et optionnellement origine). */
     fun onAddressSearchResult(destination: LatLng, originOverride: LatLng?) {
         _uiState.update {
-            it.copy(
-                destination = destination,
-                originOverride = originOverride,
-                searchQuery = "",
-                searchSuggestions = emptyList(),
-                searchError = null
+            updateSegmentSelectionEnabled(
+                it.copy(
+                    destination = destination,
+                    originOverride = originOverride,
+                    searchQuery = "",
+                    searchSuggestions = emptyList(),
+                    searchError = null
+                )
             )
         }
     }
@@ -216,12 +274,15 @@ class MapViewModel(
         val classic = _uiState.value.classicRoute
         if (classic != null) {
             _uiState.update {
-                val base = it.copy(
-                    route = classic,
-                    routeProgressPercent = 0,
-                    distanceRemainingMeters = classic.distanceMeters
+                updateSegmentSelectionEnabled(
+                    updateRouteProgress(
+                        it.copy(
+                            route = classic,
+                            routeProgressPercent = 0,
+                            distanceRemainingMeters = classic.distanceMeters
+                        )
+                    )
                 )
-                updateRouteProgress(base)
             }
         }
     }
@@ -231,12 +292,15 @@ class MapViewModel(
         val discovery = _uiState.value.discoveryRoute
         if (discovery != null) {
             _uiState.update {
-                val base = it.copy(
-                    route = discovery,
-                    routeProgressPercent = 0,
-                    distanceRemainingMeters = discovery.distanceMeters
+                updateSegmentSelectionEnabled(
+                    updateRouteProgress(
+                        it.copy(
+                            route = discovery,
+                            routeProgressPercent = 0,
+                            distanceRemainingMeters = discovery.distanceMeters
+                        )
+                    )
                 )
-                updateRouteProgress(base)
             }
         }
     }
@@ -301,27 +365,32 @@ class MapViewModel(
                 val result = discoveryResult ?: classicResult
                 if (result != null) {
                     _uiState.update {
-                        val base = it.copy(
-                            isComputingRoute = false,
-                            route = result,
-                            discoveryRoute = discoveryResult,
-                            classicRoute = classicResult,
-                            routeError = null,
-                            showRouteBottomSheet = true,
-                            routeProgressPercent = 0,
-                            distanceRemainingMeters = result.distanceMeters,
-                            usedParisAsFallback = useFallback
+                        updateSegmentSelectionEnabled(
+                            updateRouteProgress(
+                                it.copy(
+                                    isComputingRoute = false,
+                                    route = result,
+                                    discoveryRoute = discoveryResult,
+                                    classicRoute = classicResult,
+                                    routeError = null,
+                                    showRouteBottomSheet = true,
+                                    routeProgressPercent = 0,
+                                    distanceRemainingMeters = result.distanceMeters,
+                                    usedParisAsFallback = useFallback
+                                )
+                            )
                         )
-                        updateRouteProgress(base)
                     }
                 } else {
                     _uiState.update {
-                        it.copy(
-                            isComputingRoute = false,
-                            route = null,
-                            discoveryRoute = null,
-                            classicRoute = null,
-                            routeError = "Aucun chemin trouvé"
+                        updateSegmentSelectionEnabled(
+                            it.copy(
+                                isComputingRoute = false,
+                                route = null,
+                                discoveryRoute = null,
+                                classicRoute = null,
+                                routeError = "Aucun chemin trouvé"
+                            )
                         )
                     }
                 }

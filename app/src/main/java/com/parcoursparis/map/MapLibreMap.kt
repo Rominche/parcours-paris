@@ -46,10 +46,12 @@ private const val PARIS_LON = 2.3522
 private const val PARIS_ZOOM = 11.5
 private const val OSM_STYLE_URI = "asset://osm_style.json"
 private const val SEGMENTS_SOURCE_ID = "parcours-segments"
+private const val SEGMENTS_HIGHLIGHT_LAYER_ID = "parcours-segments-highlight"
 private const val ROUTE_SOURCE_ID = "route-source"
 private const val ROUTE_LAYER_ID = "route-layer"
 private const val COLOR_EXPLORED = "#4CAF50"
 private const val COLOR_UNEXPLORED = "#9E9E9E"
+private const val COLOR_SELECTED_HIGHLIGHT = "#FF9800"
 private const val COLOR_ROUTE_ACCENT = "#2196F3"
 // LOD segments non explorés (gris) : uniquement quand Paris remplit l'écran.
 // Trop dézoomé (périphérique visible) ou trop zoomé (vue « tuile » rue) → masqués.
@@ -78,11 +80,15 @@ fun MapLibreMap(
     segments: List<SegmentWithExploredState>,
     userLocation: org.maplibre.android.geometry.LatLng? = null,
     route: RouteResult? = null,
+    selectedSegmentId: Long? = null,
+    segmentSelectionEnabled: Boolean = false,
+    onMapClick: ((LatLng, Double) -> Unit)? = null,
     modifier: Modifier = Modifier
 ) {
     val lifecycleOwner = LocalLifecycleOwner.current
     val mapViewState = remember { mutableStateOf<MapView?>(null) }
     val sourceRef = remember { mutableStateOf<GeoJsonSource?>(null) }
+    val highlightLayerRef = remember { mutableStateOf<LineLayer?>(null) }
     val routeSourceRef = remember { mutableStateOf<GeoJsonSource?>(null) }
     val locationSourceRef = remember { mutableStateOf<GeoJsonSource?>(null) }
     var cameraScaleState by remember {
@@ -90,10 +96,10 @@ fun MapLibreMap(
     }
     // HIGH-1: toujours accéder à la version la plus récente des segments dans les callbacks async
     val currentSegments = rememberUpdatedState(segments)
-    // Même pattern pour userLocation : accès à la dernière valeur dans le callback setStyle
     val currentUserLocation = rememberUpdatedState(userLocation)
     val currentRoute = rememberUpdatedState(route)
-    // HIGH-2: scope pour lancer la conversion GeoJSON hors du main thread depuis setStyle
+    val currentSelectionEnabled = rememberUpdatedState(segmentSelectionEnabled)
+    val currentOnMapClick = rememberUpdatedState(onMapClick)
     val scope = rememberCoroutineScope()
 
     Box(modifier = modifier.fillMaxSize()) {
@@ -116,6 +122,15 @@ fun MapLibreMap(
                             zoom = pos.zoom.toDouble(),
                             centerLat = pos.target?.latitude ?: PARIS_LAT
                         )
+                    }
+                    map.addOnMapClickListener { point ->
+                        if (currentSelectionEnabled.value) {
+                            val zoom = map.cameraPosition.zoom.toDouble()
+                            currentOnMapClick.value?.invoke(point, zoom)
+                            true
+                        } else {
+                            false
+                        }
                     }
                     map.setStyle(Style.Builder().fromUri(OSM_STYLE_URI)) { style ->
                         map.cameraPosition = CameraPosition.Builder()
@@ -147,6 +162,22 @@ fun MapLibreMap(
                         unexploredLayer.setMaxZoom(LOD_UNEXPLORED_MAX_ZOOM)
                         style.addLayer(exploredLayer)
                         style.addLayer(unexploredLayer)
+
+                        val highlightLayer = LineLayer(SEGMENTS_HIGHLIGHT_LAYER_ID, SEGMENTS_SOURCE_ID)
+                            .withFilter(
+                                Expression.eq(
+                                    Expression.get("osmWayId"),
+                                    Expression.literal(selectedSegmentId ?: -1L)
+                                )
+                            )
+                            .withProperties(
+                                PropertyFactory.lineColor(
+                                    android.graphics.Color.parseColor(COLOR_SELECTED_HIGHLIGHT)
+                                ),
+                                PropertyFactory.lineWidth(6f)
+                            )
+                        style.addLayer(highlightLayer)
+                        highlightLayerRef.value = highlightLayer
 
                         // Route: GeoJsonSource + LineLayer (above segments, below userLocation)
                         val routeSource = GeoJsonSource(ROUTE_SOURCE_ID, """{"type":"FeatureCollection","features":[]}""")
@@ -221,6 +252,15 @@ fun MapLibreMap(
         }
     }
 
+    LaunchedEffect(selectedSegmentId) {
+        highlightLayerRef.value?.setFilter(
+            Expression.eq(
+                Expression.get("osmWayId"),
+                Expression.literal(selectedSegmentId ?: -1L)
+            )
+        )
+    }
+
     LaunchedEffect(userLocation) {
         locationSourceRef.value?.let { source ->
             val geoJson = if (userLocation != null) {
@@ -263,6 +303,7 @@ fun MapLibreMap(
             }
             mapViewState.value = null
             sourceRef.value = null
+            highlightLayerRef.value = null
             routeSourceRef.value = null
             locationSourceRef.value = null
         }

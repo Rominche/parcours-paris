@@ -1,5 +1,6 @@
 package com.parcoursparis.map
 
+import com.parcoursparis.data.repository.ProgressStats
 import com.parcoursparis.data.repository.SegmentWithExploredState
 import com.parcoursparis.map.geocoding.GeocodingResult
 import com.parcoursparis.routing.RouteResult
@@ -33,5 +34,11 @@ data class MapUiState(
     val discoveryRoute: RouteResult? = null,
     val classicRoute: RouteResult? = null,
     /** True si l'itinéraire a été calculé avec Paris comme fallback (position absente). */
-    val usedParisAsFallback: Boolean = false
+    val usedParisAsFallback: Boolean = false,
+    /** Segment sélectionné pour marquage manuel (null si aucun). */
+    val selectedSegmentId: Long? = null,
+    /** Statistiques de progression recalculées après marquage. */
+    val progressStats: ProgressStats = ProgressStats.EMPTY,
+    /** Marquage manuel actif (pas de destination ni d'itinéraire en cours). */
+    val isSegmentSelectionEnabled: Boolean = true
 )

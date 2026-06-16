@@ -18,6 +18,7 @@ object SegmentGeoJsonConverter {
     private const val TYPE_FEATURE = "Feature"
     private const val TYPE_LINESTRING = "LineString"
     private const val PROP_IS_EXPLORED = "isExplored"
+    private const val PROP_OSM_WAY_ID = "osmWayId"
 
     /**
      * Builds a GeoJSON FeatureCollection JSON string from segments.
@@ -37,6 +38,7 @@ object SegmentGeoJsonConverter {
                 }
                 val properties = JSONObject().apply {
                     put(PROP_IS_EXPLORED, item.isExplored)
+                    put(PROP_OSM_WAY_ID, item.segment.osm_way_id)
                 }
                 val feature = JSONObject().apply {
                     put("type", TYPE_FEATURE)

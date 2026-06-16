@@ -71,4 +71,22 @@ class SegmentRepositoryTest {
         repository.markAsUnexplored(1001L)
         assertEquals(emptyList<Long>(), segmentVisitDao.getExploredIds())
     }
+
+    @Test
+    fun progressStats_computesExploredPercent() = runTest {
+        segmentDao.insertAll(
+            listOf(
+                Segment(1001L, "[]"),
+                Segment(1002L, "[]"),
+                Segment(1003L, "[]"),
+                Segment(1004L, "[]")
+            )
+        )
+        segmentVisitDao.insert(SegmentVisit(1001L, 1000L))
+
+        val stats = repository.progressStats.first()
+        assertEquals(4, stats.totalCount)
+        assertEquals(1, stats.exploredCount)
+        assertEquals(25, stats.exploredPercent)
+    }
 }

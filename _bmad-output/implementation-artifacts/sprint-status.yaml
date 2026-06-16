@@ -55,10 +55,10 @@ development_status:
   2-4-suivi-itineraire-et-fallback-classique: done
   epic-2-retrospective: optional
 
-  epic-3: backlog
-  3-1-selection-segments-sur-carte: backlog
-  3-2-marquage-et-demarquage-segments: backlog
-  3-3-mise-a-jour-temps-reel-carte: backlog
+  epic-3: done
+  3-1-selection-segments-sur-carte: done
+  3-2-marquage-et-demarquage-segments: done
+  3-3-mise-a-jour-temps-reel-carte: done
   epic-3-retrospective: optional
 
   epic-4: backlog

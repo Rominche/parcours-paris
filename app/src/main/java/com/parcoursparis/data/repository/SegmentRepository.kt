@@ -35,6 +35,23 @@ class SegmentRepository(
     }.distinctUntilChanged()
 
     /**
+     * Statistiques de progression dérivées des segments et visites.
+     */
+    val progressStats: Flow<ProgressStats> = combine(
+        segmentDao.getAll(),
+        segmentVisitDao.getAll()
+    ) { segments, visits ->
+        val total = segments.size
+        val explored = visits.map { it.segment_id }.toSet().size
+        val percent = if (total > 0) ((explored.toDouble() / total) * 100).toInt() else 0
+        ProgressStats(
+            exploredCount = explored,
+            totalCount = total,
+            exploredPercent = percent
+        )
+    }.distinctUntilChanged()
+
+    /**
      * Insère les segments chargés depuis le GeoJSON dans Room.
      * À appeler au démarrage de l'app avec les segments parsés depuis assets.
      * N'insère que si la base est vide (évite rechargement à chaque démarrage).

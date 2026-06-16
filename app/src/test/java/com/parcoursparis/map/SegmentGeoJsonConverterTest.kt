@@ -42,6 +42,7 @@ class SegmentGeoJsonConverterTest {
         val feature = features.getJSONObject(0)
         assertEquals("Feature", feature.getString("type"))
         assertEquals(true, feature.getJSONObject("properties").getBoolean("isExplored"))
+        assertEquals(1001L, feature.getJSONObject("properties").getLong("osmWayId"))
         assertEquals("LineString", feature.getJSONObject("geometry").getString("type"))
     }
 
