@@ -32,16 +32,16 @@ FPS = 24
 DURATION_S = 12
 
 # Aligné sur MapLibreMap.kt — segments gris dans la bande « Paris plein écran »
-LOD_UNEXPLORED_MIN_ZOOM = 12.0
-LOD_UNEXPLORED_MAX_ZOOM = 12.8
-LOD_SEGMENT_FADE_BAND = 0.25
-LOD_ROUTE_MIN_ZOOM = 12.5
+LOD_UNEXPLORED_MIN_ZOOM = 12.4
+LOD_UNEXPLORED_MAX_ZOOM = 12.9
+LOD_SEGMENT_FADE_BAND = 0.2
+LOD_ROUTE_MIN_ZOOM = 13.0
 LOD_ROUTE_FADE_BAND = 0.35
 PARIS_CENTER = (48.8566, 2.3522)
 # Paris intra-muros (segments affichés sur toute la ville, pas en « tuile » corridor)
 PARIS_BBOX = (2.249, 48.815, 2.421, 48.902)
 PARIS_PERIPH_ZOOM = 10.8  # périphérique encore visible
-PARIS_FULL_ZOOM = 12.2  # Paris remplit l'écran
+PARIS_FULL_ZOOM = 12.7  # Paris remplit l'écran, seuil segments
 ROUTE_DETAIL_ZOOM = 13.8
 DEMO_SEGMENT_CAP = 6500  # sous-échantillonnage rendu vidéo
 
@@ -494,14 +494,14 @@ def compute_camera(t: float, mid_lat: float, mid_lon: float, route: list[tuple[f
         zoom = lerp(PARIS_PERIPH_ZOOM, 11.5, p)
         center = PARIS_CENTER
     elif t < 0.58:
-        # Paris plein écran : segments sur toute la ville (z 12–12.6)
+        # Paris plein écran : segments uniquement quand z ≥ 12.4
         p = ease_in_out((t - 0.30) / 0.28)
-        zoom = lerp(11.5, 12.5, p)
+        zoom = lerp(11.5, PARIS_FULL_ZOOM, p)
         center = PARIS_CENTER
     elif t < 0.72:
         # Rapprochement itinéraire : sortie de la bande segments (zoom > 12.8)
         p = ease_in_out((t - 0.58) / 0.14)
-        zoom = lerp(12.5, 13.2, p)
+        zoom = lerp(PARIS_FULL_ZOOM, 13.2, p)
         center = (lerp(PARIS_CENTER[0], mid_lat, p), lerp(PARIS_CENTER[1], mid_lon, p))
     else:
         # Suivi rue : itinéraire seul, sans nuage de segments

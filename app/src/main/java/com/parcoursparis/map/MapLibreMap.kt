@@ -53,8 +53,8 @@ private const val COLOR_UNEXPLORED = "#9E9E9E"
 private const val COLOR_ROUTE_ACCENT = "#2196F3"
 // LOD segments non explorés (gris) : uniquement quand Paris remplit l'écran.
 // Trop dézoomé (périphérique visible) ou trop zoomé (vue « tuile » rue) → masqués.
-private const val LOD_UNEXPLORED_MIN_ZOOM = 12.0f
-private const val LOD_UNEXPLORED_MAX_ZOOM = 12.8f
+private const val LOD_UNEXPLORED_MIN_ZOOM = 12.4f
+private const val LOD_UNEXPLORED_MAX_ZOOM = 12.9f
 
 /**
  * Composable map with OpenStreetMap tiles, pan, zoom, and colored segment layer.
