@@ -40,10 +40,18 @@ object SegmentSelectionUtils {
         maxDistanceMeters: Double
     ): SegmentWithExploredState? {
         if (segments.isEmpty() || maxDistanceMeters <= 0) return null
+        val marginDegrees = maxDistanceMeters / 111_000.0 * 1.5
+        val minLat = tapLat - marginDegrees
+        val maxLat = tapLat + marginDegrees
+        val minLon = tapLon - marginDegrees
+        val maxLon = tapLon + marginDegrees
         var best: SegmentWithExploredState? = null
         var bestDistance = Double.POSITIVE_INFINITY
         for (item in segments) {
             val coords = parseCoordinates(item.segment.geometry_json) ?: continue
+            if (!coords.any { (lon, lat) -> lat in minLat..maxLat && lon in minLon..maxLon }) {
+                continue
+            }
             val distance = minDistanceToPolylineMeters(tapLat, tapLon, coords)
             if (distance <= maxDistanceMeters && distance < bestDistance) {
                 bestDistance = distance

@@ -57,6 +57,7 @@ class MapViewModel(
     private var searchJob: Job? = null
     private var computeRouteJob: Job? = null
     private var toleranceDebounceJob: Job? = null
+    private var segmentSelectionJob: Job? = null
 
     init {
         viewModelScope.launch {
@@ -105,19 +106,28 @@ class MapViewModel(
 
     /**
      * Appelé au tap sur la carte : sélectionne le segment le plus proche si le marquage est actif.
+     * La recherche s'exécute hors thread principal pour rester fluide sur mobile.
      */
-    fun onMapTap(latLng: LatLng, zoom: Double) {
+    fun onMapTap(latLng: LatLng, zoom: Double, displayDensity: Float) {
         val state = _uiState.value
         if (!state.isSegmentSelectionEnabled || state.segments.isEmpty()) return
-        val tolerance = SegmentSelectionUtils.touchToleranceMeters(zoom, latLng.latitude)
-        val nearest = SegmentSelectionUtils.findNearestSegment(
-            tapLat = latLng.latitude,
-            tapLon = latLng.longitude,
-            segments = state.segments,
-            maxDistanceMeters = tolerance
+        val segments = state.segments
+        val tolerance = SegmentSelectionUtils.touchToleranceMeters(
+            zoom = zoom,
+            latitude = latLng.latitude,
+            density = displayDensity
         )
-        _uiState.update {
-            it.copy(selectedSegmentId = nearest?.segment?.osm_way_id)
+        segmentSelectionJob?.cancel()
+        segmentSelectionJob = viewModelScope.launch {
+            val nearest = SegmentSelectionUtils.findNearestSegment(
+                tapLat = latLng.latitude,
+                tapLon = latLng.longitude,
+                segments = segments,
+                maxDistanceMeters = tolerance
+            )
+            _uiState.update {
+                it.copy(selectedSegmentId = nearest?.segment?.osm_way_id)
+            }
         }
     }
 
@@ -305,9 +315,35 @@ class MapViewModel(
         }
     }
 
+    /** Arrête le trajet en cours et retire l'itinéraire de la carte. */
+    fun onStopRoute() {
+        computeRouteJob?.cancel()
+        toleranceDebounceJob?.cancel()
+        _uiState.update {
+            updateSegmentSelectionEnabled(
+                it.copy(
+                    destination = null,
+                    originOverride = null,
+                    searchQuery = "",
+                    searchSuggestions = emptyList(),
+                    searchError = null,
+                    route = null,
+                    discoveryRoute = null,
+                    classicRoute = null,
+                    routeError = null,
+                    showRouteBottomSheet = false,
+                    routeProgressPercent = 0,
+                    distanceRemainingMeters = 0.0,
+                    usedParisAsFallback = false,
+                    isComputingRoute = false
+                )
+            )
+        }
+    }
+
     /** Appelé quand l'utilisateur ferme le bottom sheet manuellement. */
     fun onDismissRouteBottomSheet() {
-        _uiState.update { it.copy(showRouteBottomSheet = false) }
+        onStopRoute()
     }
 
     /**

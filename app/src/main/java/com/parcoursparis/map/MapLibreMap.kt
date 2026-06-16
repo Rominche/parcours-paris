@@ -19,6 +19,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.compose.ui.viewinterop.AndroidView
+import com.parcoursparis.map.component.CompassRoseOverlay
 import com.parcoursparis.map.component.ScaleBarOverlay
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
@@ -37,6 +38,7 @@ import org.maplibre.android.style.layers.CircleLayer
 import org.maplibre.android.style.layers.LineLayer
 import org.maplibre.android.style.layers.PropertyFactory
 import org.maplibre.android.style.sources.GeoJsonSource
+import org.maplibre.android.camera.CameraUpdateFactory
 
 private const val TAG = "MapLibreMap"
 private const val USER_LOCATION_SOURCE_ID = "user-location-source"
@@ -49,14 +51,14 @@ private const val SEGMENTS_SOURCE_ID = "parcours-segments"
 private const val SEGMENTS_HIGHLIGHT_LAYER_ID = "parcours-segments-highlight"
 private const val ROUTE_SOURCE_ID = "route-source"
 private const val ROUTE_LAYER_ID = "route-layer"
-private const val COLOR_EXPLORED = "#4CAF50"
-private const val COLOR_UNEXPLORED = "#9E9E9E"
-private const val COLOR_SELECTED_HIGHLIGHT = "#FF9800"
-private const val COLOR_ROUTE_ACCENT = "#2196F3"
-// LOD segments non explorés (gris) : uniquement quand Paris remplit l'écran.
-// Trop dézoomé (périphérique visible) ou trop zoomé (vue « tuile » rue) → masqués.
-private const val LOD_UNEXPLORED_MIN_ZOOM = 12.4f
-private const val LOD_UNEXPLORED_MAX_ZOOM = 12.9f
+private const val COLOR_EXPLORED = "#8FAF9A"
+private const val COLOR_UNEXPLORED = "#B8B8B8"
+private const val COLOR_SELECTED_HIGHLIGHT = "#C9A66B"
+private const val COLOR_ROUTE_ACCENT = "#5B7C99"
+private const val COLOR_USER_LOCATION = "#C45C4A"
+// LOD segments : visibles dans une plage de zoom plus large, avec largeur réduite au dézoom.
+private const val LOD_SEGMENTS_MIN_ZOOM = 12.0f
+private const val LOD_SEGMENTS_MAX_ZOOM = 16.5f
 
 /**
  * Composable map with OpenStreetMap tiles, pan, zoom, and colored segment layer.
@@ -101,6 +103,8 @@ fun MapLibreMap(
     val currentSelectionEnabled = rememberUpdatedState(segmentSelectionEnabled)
     val currentOnMapClick = rememberUpdatedState(onMapClick)
     val scope = rememberCoroutineScope()
+    var hasCenteredOnUser by remember { mutableStateOf(false) }
+    val mapRef = remember { mutableStateOf<org.maplibre.android.maps.MapLibreMap?>(null) }
 
     Box(modifier = modifier.fillMaxSize()) {
     AndroidView(
@@ -116,6 +120,8 @@ fun MapLibreMap(
                     onStart()
                 }
                 getMapAsync { map ->
+                    mapRef.value = map
+                    map.uiSettings.isCompassEnabled = false
                     map.addOnCameraIdleListener {
                         val pos = map.cameraPosition
                         cameraScaleState = CameraScaleState(
@@ -150,16 +156,36 @@ fun MapLibreMap(
                             .withFilter(Expression.eq(Expression.get("isExplored"), Expression.literal(true)))
                             .withProperties(
                                 PropertyFactory.lineColor(android.graphics.Color.parseColor(COLOR_EXPLORED)),
-                                PropertyFactory.lineWidth(3f)
+                                PropertyFactory.lineWidth(
+                                    Expression.interpolate(
+                                        Expression.linear(),
+                                        Expression.zoom(),
+                                        Expression.literal(12.0), Expression.literal(1.2f),
+                                        Expression.literal(14.0), Expression.literal(2.0f),
+                                        Expression.literal(16.0), Expression.literal(3.0f)
+                                    )
+                                ),
+                                PropertyFactory.lineOpacity(0.75f)
                             )
                         val unexploredLayer = LineLayer("parcours-segments-unexplored", SEGMENTS_SOURCE_ID)
                             .withFilter(Expression.eq(Expression.get("isExplored"), Expression.literal(false)))
                             .withProperties(
                                 PropertyFactory.lineColor(android.graphics.Color.parseColor(COLOR_UNEXPLORED)),
-                                PropertyFactory.lineWidth(2f)
+                                PropertyFactory.lineWidth(
+                                    Expression.interpolate(
+                                        Expression.linear(),
+                                        Expression.zoom(),
+                                        Expression.literal(12.0), Expression.literal(1.0f),
+                                        Expression.literal(14.0), Expression.literal(1.5f),
+                                        Expression.literal(16.0), Expression.literal(2.0f)
+                                    )
+                                ),
+                                PropertyFactory.lineOpacity(0.55f)
                             )
-                        unexploredLayer.setMinZoom(LOD_UNEXPLORED_MIN_ZOOM)
-                        unexploredLayer.setMaxZoom(LOD_UNEXPLORED_MAX_ZOOM)
+                        exploredLayer.setMinZoom(LOD_SEGMENTS_MIN_ZOOM)
+                        exploredLayer.setMaxZoom(LOD_SEGMENTS_MAX_ZOOM)
+                        unexploredLayer.setMinZoom(LOD_SEGMENTS_MIN_ZOOM)
+                        unexploredLayer.setMaxZoom(LOD_SEGMENTS_MAX_ZOOM)
                         style.addLayer(exploredLayer)
                         style.addLayer(unexploredLayer)
 
@@ -215,7 +241,7 @@ fun MapLibreMap(
                         ).withProperties(
                             PropertyFactory.circleRadius(8f),
                             PropertyFactory.circleColor(
-                                android.graphics.Color.parseColor("#2196F3")
+                                android.graphics.Color.parseColor(COLOR_USER_LOCATION)
                             ),
                             PropertyFactory.circleStrokeWidth(2f),
                             PropertyFactory.circleStrokeColor(android.graphics.Color.WHITE)
@@ -241,6 +267,9 @@ fun MapLibreMap(
                 modifier = Modifier.align(Alignment.BottomStart).padding(16.dp)
             )
         }
+        CompassRoseOverlay(
+            modifier = Modifier.align(Alignment.TopEnd).padding(top = 80.dp, end = 16.dp)
+        )
     }
 
     LaunchedEffect(segments) {
@@ -269,6 +298,15 @@ fun MapLibreMap(
                 """{"type":"FeatureCollection","features":[]}"""
             }
             source.setGeoJson(geoJson)
+        }
+        if (userLocation != null && !hasCenteredOnUser) {
+            mapRef.value?.let { map ->
+                map.animateCamera(
+                    CameraUpdateFactory.newLatLngZoom(userLocation, 15.0),
+                    800
+                )
+                hasCenteredOnUser = true
+            }
         }
     }
 
