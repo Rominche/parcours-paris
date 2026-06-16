@@ -13,6 +13,7 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -24,13 +25,14 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
-import androidx.compose.foundation.layout.size
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Directions
-import androidx.compose.material.icons.filled.Search
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.Icon
+import androidx.compose.material.icons.filled.Search
+import androidx.compose.material3.IconButton
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
@@ -41,6 +43,7 @@ import androidx.compose.ui.semantics.testTag
 import androidx.compose.ui.unit.dp
 import androidx.navigation.NavController
 import com.parcoursparis.map.ADDRESS_SEARCH_RESULT
+import com.parcoursparis.map.component.CompassRoseOverlay
 import com.parcoursparis.map.component.RouteBottomSheet
 import com.parcoursparis.map.component.SegmentSelector
 import com.parcoursparis.navigation.NavRoutes
@@ -53,6 +56,7 @@ import com.parcoursparis.R
 @Composable
 fun MapScreen(navController: NavController) {
     val context = LocalContext.current
+    val displayDensity = context.resources.displayMetrics.density
     val appContext = context.applicationContext as ParcoursParisApplication
     val repository = appContext.segmentRepository
     val viewModel: MapViewModel = viewModel(
@@ -71,6 +75,7 @@ fun MapScreen(navController: NavController) {
         uiState.segments.find { it.segment.osm_way_id == id }
     }
     var showRationaleDialog by remember { mutableStateOf(false) }
+    val destinationClearDesc = stringResource(R.string.destination_clear_button)
 
     val permissionLauncher = rememberLauncherForActivityResult(
         ActivityResultContracts.RequestMultiplePermissions()
@@ -137,9 +142,13 @@ fun MapScreen(navController: NavController) {
             segments = uiState.segments,
             userLocation = uiState.userLocation,
             route = uiState.route,
+            mapBearing = uiState.mapBearing,
+            navigationMode = uiState.route != null,
             selectedSegmentId = uiState.selectedSegmentId,
             segmentSelectionEnabled = uiState.isSegmentSelectionEnabled,
-            onMapClick = viewModel::onMapTap,
+            onMapClick = { latLng, zoom ->
+                viewModel.onMapTap(latLng, zoom, displayDensity)
+            },
             modifier = Modifier
                 .fillMaxSize()
                 .semantics {
@@ -171,10 +180,31 @@ fun MapScreen(navController: NavController) {
                 )
                 Spacer(modifier = Modifier.size(12.dp))
                 Text(
-                    text = stringResource(R.string.address_search_button),
+                    text = if (uiState.destination != null) {
+                        uiState.searchQuery.ifBlank {
+                            stringResource(R.string.address_search_button)
+                        }
+                    } else {
+                        stringResource(R.string.address_search_button)
+                    },
                     style = MaterialTheme.typography.bodyLarge,
-                    color = MaterialTheme.colorScheme.onSurface
+                    color = MaterialTheme.colorScheme.onSurface,
+                    modifier = Modifier.weight(1f)
                 )
+                if (uiState.destination != null) {
+                    IconButton(
+                        onClick = { viewModel.onClearDestination() },
+                        modifier = Modifier.semantics {
+                            contentDescription = destinationClearDesc
+                        }
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.Close,
+                            contentDescription = null,
+                            tint = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                }
             }
         }
         LaunchedEffect(Unit) {
@@ -256,6 +286,13 @@ fun MapScreen(navController: NavController) {
                 }
             }
         }
+        val compassBottomPadding = if (uiState.destination != null) 88.dp else 16.dp
+        CompassRoseOverlay(
+            mapBearingDegrees = uiState.mapBearing.toFloat(),
+            modifier = Modifier
+                .align(Alignment.BottomEnd)
+                .padding(end = 16.dp, bottom = compassBottomPadding)
+        )
         if (uiState.destination != null) {
             FloatingActionButton(
                 onClick = { viewModel.onRequestRoute() },
@@ -293,7 +330,16 @@ fun MapScreen(navController: NavController) {
                 onToleranceChange = viewModel::onToleranceChanged,
                 onRequestClassicRoute = viewModel::onRequestClassicRoute,
                 onRequestDiscoveryRoute = viewModel::onRequestDiscoveryRoute,
+                onStopRoute = viewModel::onStopRoute,
                 onDismissRequest = viewModel::onDismissRouteBottomSheet
+            )
+        }
+        if (uiState.destination == null) {
+            CompassRoseOverlay(
+                mapBearingDegrees = uiState.mapBearing.toFloat(),
+                modifier = Modifier
+                    .align(Alignment.BottomEnd)
+                    .padding(16.dp)
             )
         }
         if (uiState.isSegmentSelectionEnabled && selectedSegment != null) {

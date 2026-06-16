@@ -37,4 +37,9 @@
     <string name="segment_mark_unexplored_button">Marquer non parcouru</string>
     <string name="segment_dismiss_selection">Fermer</string>
     <string name="segment_progress_summary" formatted="false">%1$d %% de Paris · %2$d / %3$d segments</string>
+    <string name="settings_title">Paramètres</string>
+    <string name="settings_version_label">Version de l\'application</string>
+    <string name="settings_version_value" formatted="false">%1$s (build %2$d)</string>
+    <string name="route_stop_button">Arrêter le trajet</string>
+    <string name="destination_clear_button">Effacer la destination</string>
 </resources>

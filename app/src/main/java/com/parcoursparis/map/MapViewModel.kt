@@ -12,6 +12,8 @@ import com.parcoursparis.map.geocoding.GeocodingService
 import com.parcoursparis.routing.DiscoveryRoutingEngine
 import com.parcoursparis.routing.RoutingRequest
 import com.parcoursparis.util.RouteProgressUtils
+import com.parcoursparis.util.bearingDegrees
+import com.parcoursparis.util.haversineMeters
 import com.parcoursparis.util.locationFlow
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Job
@@ -57,6 +59,8 @@ class MapViewModel(
     private var searchJob: Job? = null
     private var computeRouteJob: Job? = null
     private var toleranceDebounceJob: Job? = null
+    private var segmentSelectionJob: Job? = null
+    private var smoothedBearing: Double = 0.0
 
     init {
         viewModelScope.launch {
@@ -105,19 +109,28 @@ class MapViewModel(
 
     /**
      * Appelé au tap sur la carte : sélectionne le segment le plus proche si le marquage est actif.
+     * La recherche s'exécute hors thread principal pour rester fluide sur mobile.
      */
-    fun onMapTap(latLng: LatLng, zoom: Double) {
+    fun onMapTap(latLng: LatLng, zoom: Double, displayDensity: Float) {
         val state = _uiState.value
         if (!state.isSegmentSelectionEnabled || state.segments.isEmpty()) return
-        val tolerance = SegmentSelectionUtils.touchToleranceMeters(zoom, latLng.latitude)
-        val nearest = SegmentSelectionUtils.findNearestSegment(
-            tapLat = latLng.latitude,
-            tapLon = latLng.longitude,
-            segments = state.segments,
-            maxDistanceMeters = tolerance
+        val segments = state.segments
+        val tolerance = SegmentSelectionUtils.touchToleranceMeters(
+            zoom = zoom,
+            latitude = latLng.latitude,
+            density = displayDensity
         )
-        _uiState.update {
-            it.copy(selectedSegmentId = nearest?.segment?.osm_way_id)
+        segmentSelectionJob?.cancel()
+        segmentSelectionJob = viewModelScope.launch {
+            val nearest = SegmentSelectionUtils.findNearestSegment(
+                tapLat = latLng.latitude,
+                tapLon = latLng.longitude,
+                segments = segments,
+                maxDistanceMeters = tolerance
+            )
+            _uiState.update {
+                it.copy(selectedSegmentId = nearest?.segment?.osm_way_id)
+            }
         }
     }
 
@@ -156,9 +169,21 @@ class MapViewModel(
                 locationFlow(appContext)
                     .catch { _uiState.update { it.copy(userLocation = null) } }
                     .collect { location ->
-                        val latLng = location?.let { LatLng(it.latitude, it.longitude) }
                         _uiState.update { state ->
-                            val updated = state.copy(userLocation = latLng)
+                            val latLng = location?.let { LatLng(it.latitude, it.longitude) }
+                            val bearing = if (state.route != null && location != null && latLng != null) {
+                                computeNavigationBearing(
+                                    previous = state.userLocation,
+                                    current = latLng,
+                                    location = location
+                                )
+                            } else {
+                                0.0
+                            }
+                            val updated = state.copy(
+                                userLocation = latLng,
+                                mapBearing = bearing
+                            )
                             updateRouteProgress(updated)
                         }
                     }
@@ -305,9 +330,37 @@ class MapViewModel(
         }
     }
 
+    /** Arrête le trajet en cours et retire l'itinéraire de la carte. */
+    fun onStopRoute() {
+        computeRouteJob?.cancel()
+        toleranceDebounceJob?.cancel()
+        _uiState.update {
+            updateSegmentSelectionEnabled(
+                it.copy(
+                    destination = null,
+                    originOverride = null,
+                    searchQuery = "",
+                    searchSuggestions = emptyList(),
+                    searchError = null,
+                    route = null,
+                    discoveryRoute = null,
+                    classicRoute = null,
+                    routeError = null,
+                    showRouteBottomSheet = false,
+                    routeProgressPercent = 0,
+                    distanceRemainingMeters = 0.0,
+                    usedParisAsFallback = false,
+                    isComputingRoute = false,
+                    mapBearing = 0.0
+                )
+            )
+        }
+        smoothedBearing = 0.0
+    }
+
     /** Appelé quand l'utilisateur ferme le bottom sheet manuellement. */
     fun onDismissRouteBottomSheet() {
-        _uiState.update { it.copy(showRouteBottomSheet = false) }
+        onStopRoute()
     }
 
     /**
@@ -450,5 +503,44 @@ class MapViewModel(
             userPreferences.setTolerancePercent(clamped)
             onRequestRoute()
         }
+    }
+
+    private fun computeNavigationBearing(
+        previous: LatLng?,
+        current: LatLng,
+        location: android.location.Location
+    ): Double {
+        val rawBearing = when {
+            location.hasBearing() && location.hasSpeed() && location.speed >= 0.5f ->
+                location.bearing.toDouble()
+            previous != null -> {
+                val movedMeters = haversineMeters(
+                    previous.latitude,
+                    previous.longitude,
+                    current.latitude,
+                    current.longitude
+                )
+                if (movedMeters >= 3.0) {
+                    bearingDegrees(
+                        previous.latitude,
+                        previous.longitude,
+                        current.latitude,
+                        current.longitude
+                    )
+                } else {
+                    smoothedBearing
+                }
+            }
+            else -> smoothedBearing
+        }
+        smoothedBearing = smoothBearing(smoothedBearing, rawBearing)
+        return smoothedBearing
+    }
+
+    private fun smoothBearing(current: Double, target: Double): Double {
+        var diff = target - current
+        while (diff > 180.0) diff -= 360.0
+        while (diff < -180.0) diff += 360.0
+        return (current + diff * 0.35 + 360.0) % 360.0
     }
 }

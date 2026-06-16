@@ -1,18 +1,24 @@
 {
   "version": 8,
   "sources": {
-    "osm": {
+    "carto-light": {
       "type": "raster",
-      "tiles": ["https://tile.openstreetmap.org/{z}/{x}/{y}.png"],
+      "tiles": ["https://basemaps.cartocdn.com/light_all/{z}/{x}/{y}.png"],
       "tileSize": 256,
-      "attribution": "© OpenStreetMap contributors"
+      "attribution": "© OpenStreetMap contributors © CARTO"
     }
   },
   "layers": [
     {
-      "id": "osm-tiles",
+      "id": "carto-light-tiles",
       "type": "raster",
-      "source": "osm"
+      "source": "carto-light",
+      "paint": {
+        "raster-saturation": -0.35,
+        "raster-contrast": -0.1,
+        "raster-brightness-min": 0.05,
+        "raster-brightness-max": 0.92
+      }
     }
   ]
 }

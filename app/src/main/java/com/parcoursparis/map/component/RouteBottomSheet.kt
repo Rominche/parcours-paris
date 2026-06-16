@@ -1,12 +1,13 @@
 package com.parcoursparis.map.component
 
+import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
-import androidx.compose.material3.Button
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.Text
@@ -34,6 +35,7 @@ fun RouteBottomSheet(
     onToleranceChange: (Int) -> Unit,
     onRequestClassicRoute: () -> Unit,
     onRequestDiscoveryRoute: () -> Unit,
+    onStopRoute: () -> Unit,
     onDismissRequest: () -> Unit
 ) {
     val etaMinutes = (route.etaSeconds / 60).toInt()
@@ -95,6 +97,17 @@ fun RouteBottomSheet(
                 ) {
                     Text(stringResource(R.string.route_button_discovery))
                 }
+            }
+            Spacer(modifier = Modifier.height(24.dp))
+            Button(
+                onClick = onStopRoute,
+                modifier = Modifier.fillMaxWidth(),
+                colors = ButtonDefaults.buttonColors(
+                    containerColor = MaterialTheme.colorScheme.errorContainer,
+                    contentColor = MaterialTheme.colorScheme.onErrorContainer
+                )
+            ) {
+                Text(stringResource(R.string.route_stop_button))
             }
         }
     }

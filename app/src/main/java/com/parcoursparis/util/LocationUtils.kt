@@ -10,15 +10,28 @@ import androidx.core.content.ContextCompat
 import kotlinx.coroutines.channels.awaitClose
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.callbackFlow
+import kotlin.math.abs
+
+private const val MIN_UPDATE_INTERVAL_MS = 1000L
+private const val MIN_UPDATE_DISTANCE_METERS = 1f
 
 /**
  * Flow-based location provider wrapping LocationManager.
- * Emits Location? on each GPS update; null when unavailable or permission denied.
- * Uses callbackFlow for integration with Coroutines/Flow.
+ * GPS prioritaire ; intervalle réduit pour un suivi plus réactif.
  */
 fun locationFlow(context: Context): Flow<Location?> = callbackFlow {
     val locationManager = context.getSystemService(Context.LOCATION_SERVICE) as LocationManager
-    val listener = LocationListener { location -> trySend(location) }
+    var bestLocation: Location? = null
+
+    fun emitIfBetter(location: Location) {
+        val current = bestLocation
+        if (current == null || isBetterLocation(location, current)) {
+            bestLocation = location
+            trySend(location)
+        }
+    }
+
+    val listener = LocationListener { location -> emitIfBetter(location) }
 
     val provider = when {
         locationManager.isProviderEnabled(LocationManager.GPS_PROVIDER) -> LocationManager.GPS_PROVIDER
@@ -28,7 +41,6 @@ fun locationFlow(context: Context): Flow<Location?> = callbackFlow {
 
     if (provider != null) {
         try {
-            // Émet immédiatement la dernière position connue (évite "Position non disponible" au démarrage)
             @Suppress("DEPRECATION")
             var lastKnown = locationManager.getLastKnownLocation(provider)
             if (lastKnown == null && provider != LocationManager.NETWORK_PROVIDER) {
@@ -38,11 +50,14 @@ fun locationFlow(context: Context): Flow<Location?> = callbackFlow {
                 lastKnown = locationManager.getLastKnownLocation(LocationManager.GPS_PROVIDER)
             }
             if (lastKnown != null) {
-                trySend(lastKnown)
+                emitIfBetter(lastKnown)
             }
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
-                val request = android.location.LocationRequest.Builder(2000L)
-                    .setMinUpdateDistanceMeters(5f)
+                val request = android.location.LocationRequest.Builder(MIN_UPDATE_INTERVAL_MS)
+                    .setMinUpdateDistanceMeters(MIN_UPDATE_DISTANCE_METERS)
+                    .setMinUpdateIntervalMillis(MIN_UPDATE_INTERVAL_MS)
+                    .setMaxUpdateDelayMillis(MIN_UPDATE_INTERVAL_MS * 2)
+                    .setQuality(android.location.LocationRequest.QUALITY_HIGH_ACCURACY)
                     .build()
                 locationManager.requestLocationUpdates(
                     provider,
@@ -54,13 +69,13 @@ fun locationFlow(context: Context): Flow<Location?> = callbackFlow {
                 @Suppress("DEPRECATION")
                 locationManager.requestLocationUpdates(
                     provider,
-                    2000L,
-                    5f,
+                    MIN_UPDATE_INTERVAL_MS,
+                    MIN_UPDATE_DISTANCE_METERS,
                     listener,
                     Looper.getMainLooper()
                 )
             }
-        } catch (e: SecurityException) {
+        } catch (_: SecurityException) {
             trySend(null)
         }
     } else {
@@ -68,4 +83,26 @@ fun locationFlow(context: Context): Flow<Location?> = callbackFlow {
     }
 
     awaitClose { locationManager.removeUpdates(listener) }
+}
+
+private fun isBetterLocation(location: Location, currentBest: Location): Boolean {
+    if (location.provider == LocationManager.GPS_PROVIDER &&
+        currentBest.provider == LocationManager.NETWORK_PROVIDER
+    ) {
+        return true
+    }
+    if (location.provider == LocationManager.NETWORK_PROVIDER &&
+        currentBest.provider == LocationManager.GPS_PROVIDER
+    ) {
+        return false
+    }
+
+    val timeDelta = location.time - currentBest.time
+    if (timeDelta > 10_000L) return true
+    if (timeDelta < -10_000L) return false
+
+    val accuracyDelta = (location.accuracy - currentBest.accuracy).toInt()
+    if (accuracyDelta < 0) return true
+    if (accuracyDelta > 0) return false
+    return timeDelta > 0
 }

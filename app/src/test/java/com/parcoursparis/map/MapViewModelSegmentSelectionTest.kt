@@ -68,7 +68,7 @@ class MapViewModelSegmentSelectionTest {
         val state = viewModel.uiState.first { !it.isLoading }
         assertTrue(state.isSegmentSelectionEnabled)
 
-        viewModel.onMapTap(LatLng(48.855, 2.355), zoom = 14.0)
+        viewModel.onMapTap(LatLng(48.855, 2.355), zoom = 14.0, displayDensity = 2.75f)
         advanceUntilIdle()
 
         assertEquals(1001L, viewModel.uiState.value.selectedSegmentId)
@@ -78,11 +78,11 @@ class MapViewModelSegmentSelectionTest {
     fun onMapTap_clearsSelectionWhenNoSegmentNearby() = runTest {
         seedSegments()
         advanceUntilIdle()
-        viewModel.onMapTap(LatLng(48.855, 2.355), zoom = 14.0)
+        viewModel.onMapTap(LatLng(48.855, 2.355), zoom = 14.0, displayDensity = 2.75f)
         advanceUntilIdle()
         assertEquals(1001L, viewModel.uiState.value.selectedSegmentId)
 
-        viewModel.onMapTap(LatLng(49.0, 2.8), zoom = 14.0)
+        viewModel.onMapTap(LatLng(49.0, 2.8), zoom = 14.0, displayDensity = 2.75f)
         advanceUntilIdle()
         assertNull(viewModel.uiState.value.selectedSegmentId)
     }
@@ -91,7 +91,7 @@ class MapViewModelSegmentSelectionTest {
     fun onMarkSelectedExplored_updatesRepositoryAndUiState() = runTest {
         seedSegments()
         advanceUntilIdle()
-        viewModel.onMapTap(LatLng(48.855, 2.355), zoom = 14.0)
+        viewModel.onMapTap(LatLng(48.855, 2.355), zoom = 14.0, displayDensity = 2.75f)
         viewModel.onMarkSelectedExplored()
         advanceUntilIdle()
 
@@ -109,7 +109,7 @@ class MapViewModelSegmentSelectionTest {
         seedSegments()
         segmentVisitDao.insert(SegmentVisit(1001L, 1000L))
         advanceUntilIdle()
-        viewModel.onMapTap(LatLng(48.855, 2.355), zoom = 14.0)
+        viewModel.onMapTap(LatLng(48.855, 2.355), zoom = 14.0, displayDensity = 2.75f)
         viewModel.onMarkSelectedUnexplored()
         advanceUntilIdle()
 
@@ -129,7 +129,7 @@ class MapViewModelSegmentSelectionTest {
         assertFalse(state.isSegmentSelectionEnabled)
         assertNull(state.selectedSegmentId)
 
-        viewModel.onMapTap(LatLng(48.855, 2.355), zoom = 14.0)
+        viewModel.onMapTap(LatLng(48.855, 2.355), zoom = 14.0, displayDensity = 2.75f)
         advanceUntilIdle()
         assertNull(viewModel.uiState.value.selectedSegmentId)
     }
@@ -143,7 +143,7 @@ class MapViewModelSegmentSelectionTest {
         advanceUntilIdle()
 
         assertTrue(viewModel.uiState.value.isSegmentSelectionEnabled)
-        viewModel.onMapTap(LatLng(48.855, 2.355), zoom = 14.0)
+        viewModel.onMapTap(LatLng(48.855, 2.355), zoom = 14.0, displayDensity = 2.75f)
         advanceUntilIdle()
         assertEquals(1001L, viewModel.uiState.value.selectedSegmentId)
     }

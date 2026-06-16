@@ -496,4 +496,33 @@ class MapViewModelTest {
         assertTrue("Progress should increase when moving along route", uiState.routeProgressPercent > 0)
         assertTrue("Distance remaining should decrease", uiState.distanceRemainingMeters < 2000)
     }
+
+    @Test
+    fun onStopRoute_clearsRouteAndReEnablesSegmentSelection() = runTest {
+        val s1 = Segment(1001L, "[[2.35,48.85],[2.36,48.86]]")
+        segmentDao.insertAll(listOf(s1))
+        viewModel.uiState.first { !it.isLoading }
+        viewModel.onDestinationSelected(GeocodingResult("Paris", 48.86, 2.36, null))
+
+        fakeRoutingEngine.nextResult = RouteResult(
+            geometry = listOf(LatLng(48.85, 2.35), LatLng(48.86, 2.36)),
+            etaSeconds = 120L,
+            distanceMeters = 1500.0,
+            routeType = RouteType.DISCOVERY
+        )
+        viewModel.onRequestRoute(useParisAsFallback = true)
+        advanceUntilIdle()
+
+        assertNotNull(viewModel.uiState.value.route)
+        assertFalse(viewModel.uiState.value.isSegmentSelectionEnabled)
+
+        viewModel.onStopRoute()
+        advanceUntilIdle()
+
+        val state = viewModel.uiState.value
+        assertNull(state.route)
+        assertNull(state.destination)
+        assertFalse(state.showRouteBottomSheet)
+        assertTrue(state.isSegmentSelectionEnabled)
+    }
 }
