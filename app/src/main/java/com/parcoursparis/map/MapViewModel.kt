@@ -12,6 +12,8 @@ import com.parcoursparis.map.geocoding.GeocodingService
 import com.parcoursparis.routing.DiscoveryRoutingEngine
 import com.parcoursparis.routing.RoutingRequest
 import com.parcoursparis.util.RouteProgressUtils
+import com.parcoursparis.util.bearingDegrees
+import com.parcoursparis.util.haversineMeters
 import com.parcoursparis.util.locationFlow
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Job
@@ -58,6 +60,7 @@ class MapViewModel(
     private var computeRouteJob: Job? = null
     private var toleranceDebounceJob: Job? = null
     private var segmentSelectionJob: Job? = null
+    private var smoothedBearing: Double = 0.0
 
     init {
         viewModelScope.launch {
@@ -166,9 +169,21 @@ class MapViewModel(
                 locationFlow(appContext)
                     .catch { _uiState.update { it.copy(userLocation = null) } }
                     .collect { location ->
-                        val latLng = location?.let { LatLng(it.latitude, it.longitude) }
                         _uiState.update { state ->
-                            val updated = state.copy(userLocation = latLng)
+                            val latLng = location?.let { LatLng(it.latitude, it.longitude) }
+                            val bearing = if (state.route != null && location != null && latLng != null) {
+                                computeNavigationBearing(
+                                    previous = state.userLocation,
+                                    current = latLng,
+                                    location = location
+                                )
+                            } else {
+                                0.0
+                            }
+                            val updated = state.copy(
+                                userLocation = latLng,
+                                mapBearing = bearing
+                            )
                             updateRouteProgress(updated)
                         }
                     }
@@ -335,10 +350,12 @@ class MapViewModel(
                     routeProgressPercent = 0,
                     distanceRemainingMeters = 0.0,
                     usedParisAsFallback = false,
-                    isComputingRoute = false
+                    isComputingRoute = false,
+                    mapBearing = 0.0
                 )
             )
         }
+        smoothedBearing = 0.0
     }
 
     /** Appelé quand l'utilisateur ferme le bottom sheet manuellement. */
@@ -486,5 +503,44 @@ class MapViewModel(
             userPreferences.setTolerancePercent(clamped)
             onRequestRoute()
         }
+    }
+
+    private fun computeNavigationBearing(
+        previous: LatLng?,
+        current: LatLng,
+        location: android.location.Location
+    ): Double {
+        val rawBearing = when {
+            location.hasBearing() && location.hasSpeed() && location.speed >= 0.5f ->
+                location.bearing.toDouble()
+            previous != null -> {
+                val movedMeters = haversineMeters(
+                    previous.latitude,
+                    previous.longitude,
+                    current.latitude,
+                    current.longitude
+                )
+                if (movedMeters >= 3.0) {
+                    bearingDegrees(
+                        previous.latitude,
+                        previous.longitude,
+                        current.latitude,
+                        current.longitude
+                    )
+                } else {
+                    smoothedBearing
+                }
+            }
+            else -> smoothedBearing
+        }
+        smoothedBearing = smoothBearing(smoothedBearing, rawBearing)
+        return smoothedBearing
+    }
+
+    private fun smoothBearing(current: Double, target: Double): Double {
+        var diff = target - current
+        while (diff > 180.0) diff -= 360.0
+        while (diff < -180.0) diff += 360.0
+        return (current + diff * 0.35 + 360.0) % 360.0
     }
 }

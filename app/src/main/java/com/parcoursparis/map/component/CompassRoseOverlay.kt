@@ -13,15 +13,17 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 
 /**
- * Rose des vents fixe indiquant le nord (carte non pivotée).
+ * Rose des vents : le N reste aligné sur le nord géographique quand la carte pivote.
  */
 @Composable
 fun CompassRoseOverlay(
+    mapBearingDegrees: Float,
     modifier: Modifier = Modifier
 ) {
     val surfaceColor = MaterialTheme.colorScheme.surface
@@ -30,6 +32,7 @@ fun CompassRoseOverlay(
 
     Box(
         modifier = modifier
+            .graphicsLayer { rotationZ = -mapBearingDegrees }
             .background(surfaceColor.copy(alpha = 0.9f))
             .padding(8.dp)
             .size(48.dp),

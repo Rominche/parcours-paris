@@ -40,5 +40,7 @@ data class MapUiState(
     /** Statistiques de progression recalculées après marquage. */
     val progressStats: ProgressStats = ProgressStats.EMPTY,
     /** Marquage manuel actif (pas de destination ni d'itinéraire en cours). */
-    val isSegmentSelectionEnabled: Boolean = true
+    val isSegmentSelectionEnabled: Boolean = true,
+    /** Orientation de la carte (0 = nord en haut). Utilisé en navigation GPS. */
+    val mapBearing: Double = 0.0
 )

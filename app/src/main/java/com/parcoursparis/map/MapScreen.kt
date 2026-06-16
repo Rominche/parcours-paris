@@ -43,6 +43,7 @@ import androidx.compose.ui.semantics.testTag
 import androidx.compose.ui.unit.dp
 import androidx.navigation.NavController
 import com.parcoursparis.map.ADDRESS_SEARCH_RESULT
+import com.parcoursparis.map.component.CompassRoseOverlay
 import com.parcoursparis.map.component.RouteBottomSheet
 import com.parcoursparis.map.component.SegmentSelector
 import com.parcoursparis.navigation.NavRoutes
@@ -141,6 +142,8 @@ fun MapScreen(navController: NavController) {
             segments = uiState.segments,
             userLocation = uiState.userLocation,
             route = uiState.route,
+            mapBearing = uiState.mapBearing,
+            navigationMode = uiState.route != null,
             selectedSegmentId = uiState.selectedSegmentId,
             segmentSelectionEnabled = uiState.isSegmentSelectionEnabled,
             onMapClick = { latLng, zoom ->
@@ -283,6 +286,13 @@ fun MapScreen(navController: NavController) {
                 }
             }
         }
+        val compassBottomPadding = if (uiState.destination != null) 88.dp else 16.dp
+        CompassRoseOverlay(
+            mapBearingDegrees = uiState.mapBearing.toFloat(),
+            modifier = Modifier
+                .align(Alignment.BottomEnd)
+                .padding(end = 16.dp, bottom = compassBottomPadding)
+        )
         if (uiState.destination != null) {
             FloatingActionButton(
                 onClick = { viewModel.onRequestRoute() },
@@ -322,6 +332,14 @@ fun MapScreen(navController: NavController) {
                 onRequestDiscoveryRoute = viewModel::onRequestDiscoveryRoute,
                 onStopRoute = viewModel::onStopRoute,
                 onDismissRequest = viewModel::onDismissRouteBottomSheet
+            )
+        }
+        if (uiState.destination == null) {
+            CompassRoseOverlay(
+                mapBearingDegrees = uiState.mapBearing.toFloat(),
+                modifier = Modifier
+                    .align(Alignment.BottomEnd)
+                    .padding(16.dp)
             )
         }
         if (uiState.isSegmentSelectionEnabled && selectedSegment != null) {

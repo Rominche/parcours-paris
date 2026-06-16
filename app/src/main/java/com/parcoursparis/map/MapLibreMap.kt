@@ -19,7 +19,6 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.compose.ui.viewinterop.AndroidView
-import com.parcoursparis.map.component.CompassRoseOverlay
 import com.parcoursparis.map.component.ScaleBarOverlay
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
@@ -82,6 +81,8 @@ fun MapLibreMap(
     segments: List<SegmentWithExploredState>,
     userLocation: org.maplibre.android.geometry.LatLng? = null,
     route: RouteResult? = null,
+    mapBearing: Double = 0.0,
+    navigationMode: Boolean = false,
     selectedSegmentId: Long? = null,
     segmentSelectionEnabled: Boolean = false,
     onMapClick: ((LatLng, Double) -> Unit)? = null,
@@ -122,6 +123,8 @@ fun MapLibreMap(
                 getMapAsync { map ->
                     mapRef.value = map
                     map.uiSettings.isCompassEnabled = false
+                    map.uiSettings.isRotateGesturesEnabled = false
+                    map.uiSettings.isTiltGesturesEnabled = false
                     map.addOnCameraIdleListener {
                         val pos = map.cameraPosition
                         cameraScaleState = CameraScaleState(
@@ -267,9 +270,6 @@ fun MapLibreMap(
                 modifier = Modifier.align(Alignment.BottomStart).padding(16.dp)
             )
         }
-        CompassRoseOverlay(
-            modifier = Modifier.align(Alignment.TopEnd).padding(top = 80.dp, end = 16.dp)
-        )
     }
 
     LaunchedEffect(segments) {
@@ -299,14 +299,43 @@ fun MapLibreMap(
             }
             source.setGeoJson(geoJson)
         }
-        if (userLocation != null && !hasCenteredOnUser) {
-            mapRef.value?.let { map ->
-                map.animateCamera(
-                    CameraUpdateFactory.newLatLngZoom(userLocation, 15.0),
-                    800
-                )
-                hasCenteredOnUser = true
-            }
+    }
+
+    LaunchedEffect(userLocation, navigationMode, mapBearing) {
+        val map = mapRef.value ?: return@LaunchedEffect
+        val loc = userLocation ?: return@LaunchedEffect
+        if (navigationMode) {
+            map.animateCamera(
+                CameraUpdateFactory.newCameraPosition(
+                    CameraPosition.Builder()
+                        .target(loc)
+                        .zoom(17.0)
+                        .bearing(mapBearing)
+                        .tilt(0.0)
+                        .build()
+                ),
+                400
+            )
+            hasCenteredOnUser = true
+        } else if (!hasCenteredOnUser) {
+            map.animateCamera(
+                CameraUpdateFactory.newCameraPosition(
+                    CameraPosition.Builder()
+                        .target(loc)
+                        .zoom(15.0)
+                        .bearing(0.0)
+                        .tilt(0.0)
+                        .build()
+                ),
+                800
+            )
+            hasCenteredOnUser = true
+        }
+    }
+
+    LaunchedEffect(navigationMode) {
+        if (!navigationMode) {
+            mapRef.value?.animateCamera(CameraUpdateFactory.bearingTo(0.0), 500)
         }
     }
 

@@ -19,3 +19,15 @@ fun haversineMeters(lat1: Double, lon1: Double, lat2: Double, lon2: Double): Dou
     val c = 2 * atan2(sqrt(a), sqrt(1 - a))
     return EARTH_RADIUS_METERS * c
 }
+
+/**
+ * Cap initial (degrés, 0 = nord) entre deux points WGS-84.
+ */
+fun bearingDegrees(lat1: Double, lon1: Double, lat2: Double, lon2: Double): Double {
+    val lat1Rad = Math.toRadians(lat1)
+    val lat2Rad = Math.toRadians(lat2)
+    val dLon = Math.toRadians(lon2 - lon1)
+    val y = sin(dLon) * cos(lat2Rad)
+    val x = cos(lat1Rad) * sin(lat2Rad) - sin(lat1Rad) * cos(lat2Rad) * cos(dLon)
+    return (Math.toDegrees(atan2(y, x)) + 360.0) % 360.0
+}
