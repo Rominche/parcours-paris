@@ -42,6 +42,7 @@ import androidx.compose.ui.unit.dp
 import androidx.navigation.NavController
 import com.parcoursparis.map.ADDRESS_SEARCH_RESULT
 import com.parcoursparis.map.component.RouteBottomSheet
+import com.parcoursparis.map.component.SegmentSelector
 import com.parcoursparis.navigation.NavRoutes
 import org.maplibre.android.geometry.LatLng
 import androidx.core.content.ContextCompat
@@ -66,6 +67,9 @@ fun MapScreen(navController: NavController) {
     val uiState by viewModel.uiState.collectAsState()
     val mapContentDesc = stringResource(R.string.map_content_description)
     val routeComputeButtonDesc = stringResource(R.string.route_compute_button)
+    val selectedSegment = uiState.selectedSegmentId?.let { id ->
+        uiState.segments.find { it.segment.osm_way_id == id }
+    }
     var showRationaleDialog by remember { mutableStateOf(false) }
 
     val permissionLauncher = rememberLauncherForActivityResult(
@@ -133,6 +137,9 @@ fun MapScreen(navController: NavController) {
             segments = uiState.segments,
             userLocation = uiState.userLocation,
             route = uiState.route,
+            selectedSegmentId = uiState.selectedSegmentId,
+            segmentSelectionEnabled = uiState.isSegmentSelectionEnabled,
+            onMapClick = viewModel::onMapTap,
             modifier = Modifier
                 .fillMaxSize()
                 .semantics {
@@ -287,6 +294,16 @@ fun MapScreen(navController: NavController) {
                 onRequestClassicRoute = viewModel::onRequestClassicRoute,
                 onRequestDiscoveryRoute = viewModel::onRequestDiscoveryRoute,
                 onDismissRequest = viewModel::onDismissRouteBottomSheet
+            )
+        }
+        if (uiState.isSegmentSelectionEnabled && selectedSegment != null) {
+            SegmentSelector(
+                selectedSegment = selectedSegment,
+                progressStats = uiState.progressStats,
+                onMarkExplored = viewModel::onMarkSelectedExplored,
+                onMarkUnexplored = viewModel::onMarkSelectedUnexplored,
+                onDismiss = viewModel::onClearSegmentSelection,
+                modifier = Modifier.align(Alignment.BottomCenter)
             )
         }
     }

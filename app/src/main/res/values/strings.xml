@@ -31,4 +31,10 @@
     <string name="address_search_destination_placeholder">Destination</string>
     <string name="address_search_confirm">Valider et calculer l\'itinéraire</string>
     <string name="address_search_button">Où allez-vous ?</string>
+    <string name="segment_selected_explored">Segment sélectionné (parcouru)</string>
+    <string name="segment_selected_unexplored">Segment sélectionné (non parcouru)</string>
+    <string name="segment_mark_explored_button">Marquer parcouru</string>
+    <string name="segment_mark_unexplored_button">Marquer non parcouru</string>
+    <string name="segment_dismiss_selection">Fermer</string>
+    <string name="segment_progress_summary" formatted="false">%1$d %% de Paris · %2$d / %3$d segments</string>
 </resources>
