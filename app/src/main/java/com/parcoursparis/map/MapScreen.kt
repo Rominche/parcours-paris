@@ -334,14 +334,6 @@ fun MapScreen(navController: NavController) {
                 onDismissRequest = viewModel::onDismissRouteBottomSheet
             )
         }
-        if (uiState.destination == null) {
-            CompassRoseOverlay(
-                mapBearingDegrees = uiState.mapBearing.toFloat(),
-                modifier = Modifier
-                    .align(Alignment.BottomEnd)
-                    .padding(16.dp)
-            )
-        }
         if (uiState.isSegmentSelectionEnabled && selectedSegment != null) {
             SegmentSelector(
                 selectedSegment = selectedSegment,
