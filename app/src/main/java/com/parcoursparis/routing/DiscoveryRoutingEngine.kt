@@ -38,6 +38,18 @@ interface DiscoveryRoutingEngine {
         origin: LatLng,
         destination: LatLng
     ): RouteResult?
+
+    /**
+     * Calcule discovery + classique en une passe (un seul graphe, filtrage spatial).
+     */
+    suspend fun computeBothRoutes(
+        segments: List<SegmentWithExploredState>,
+        origin: LatLng,
+        destination: LatLng,
+        tolerancePercent: Double = 15.0
+    ): Pair<RouteResult?, RouteResult?> =
+        computeRoute(segments, origin, destination, tolerancePercent) to
+            computeClassicRoute(segments, origin, destination)
 }
 
 /**
@@ -47,51 +59,67 @@ interface DiscoveryRoutingEngine {
  */
 class DiscoveryRoutingEngineImpl : DiscoveryRoutingEngine {
 
+    override suspend fun computeBothRoutes(
+        segments: List<SegmentWithExploredState>,
+        origin: LatLng,
+        destination: LatLng,
+        tolerancePercent: Double
+    ): Pair<RouteResult?, RouteResult?> = withContext(Dispatchers.Default) {
+        for (margin in RoutingSegmentFilter.ROUTE_MARGINS_DEGREES) {
+            val filtered = RoutingSegmentFilter.filterForRoute(
+                segments = segments,
+                origin = origin,
+                destination = destination,
+                marginDegrees = margin
+            )
+            if (filtered.isEmpty()) continue
+
+            val graph = GraphBuilder.build(filtered)
+            val originKey = findNearestNode(graph, origin) ?: continue
+            val destKey = findNearestNode(graph, destination) ?: continue
+
+            val classicPath = dijkstraShortestPath(graph, originKey, destKey)
+            val shortestDistance = dijkstraShortest(graph, originKey, destKey)
+            val discoveryPath = if (shortestDistance != null && shortestDistance.isFinite()) {
+                val maxAllowed = shortestDistance * (1 + tolerancePercent / 100)
+                dijkstraDiscovery(graph, originKey, destKey, maxAllowed)
+            } else {
+                null
+            }
+
+            val discoveryResult = discoveryPath?.let {
+                buildRouteResult(origin, destination, it, RouteType.DISCOVERY)
+            }
+            val classicResult = classicPath?.let {
+                buildRouteResult(origin, destination, it, RouteType.CLASSIC)
+            }
+
+            if (discoveryResult != null || classicResult != null) {
+                return@withContext discoveryResult to classicResult
+            }
+        }
+        null to null
+    }
+
     override suspend fun computeRoute(
         segments: List<SegmentWithExploredState>,
         origin: LatLng,
         destination: LatLng,
         tolerancePercent: Double
-    ): RouteResult? = withContext(Dispatchers.Default) {
-        val graph = GraphBuilder.build(segments)
-        val originKey = findNearestNode(graph, origin) ?: return@withContext null
-        val destKey = findNearestNode(graph, destination) ?: return@withContext null
-
-        val shortestDistance = dijkstraShortest(graph, originKey, destKey)
-            ?: return@withContext null
-        val maxAllowedDistance = shortestDistance * (1 + tolerancePercent / 100)
-
-        val path = dijkstraDiscovery(graph, originKey, destKey, maxAllowedDistance)
-            ?: return@withContext null
-
-        val segmentGeometry = buildGeometryFromPath(path)
-        val geometry = listOf(origin) + segmentGeometry + destination
-        val firstNode = segmentGeometry.firstOrNull()
-        val lastNode = segmentGeometry.lastOrNull()
-        val distanceMeters =
-            (if (firstNode != null) haversineMeters(origin.latitude, origin.longitude, firstNode.latitude, firstNode.longitude) else 0.0) +
-                path.sumOf { it.lengthMeters } +
-                (if (lastNode != null) haversineMeters(lastNode.latitude, lastNode.longitude, destination.latitude, destination.longitude) else 0.0)
-        val etaSeconds = (distanceMeters / WALKING_SPEED_MPS).toLong()
-
-        RouteResult(
-            geometry = geometry,
-            etaSeconds = etaSeconds,
-            distanceMeters = distanceMeters,
-            routeType = RouteType.DISCOVERY
-        )
-    }
+    ): RouteResult? = computeBothRoutes(segments, origin, destination, tolerancePercent).first
 
     override suspend fun computeClassicRoute(
         segments: List<SegmentWithExploredState>,
         origin: LatLng,
         destination: LatLng
-    ): RouteResult? = withContext(Dispatchers.Default) {
-        val graph = GraphBuilder.build(segments)
-        val originKey = findNearestNode(graph, origin) ?: return@withContext null
-        val destKey = findNearestNode(graph, destination) ?: return@withContext null
+    ): RouteResult? = computeBothRoutes(segments, origin, destination).second
 
-        val path = dijkstraShortestPath(graph, originKey, destKey) ?: return@withContext null
+    private fun buildRouteResult(
+        origin: LatLng,
+        destination: LatLng,
+        path: List<RoutingEdge>,
+        routeType: RouteType
+    ): RouteResult {
         val segmentGeometry = buildGeometryFromPath(path)
         val geometry = listOf(origin) + segmentGeometry + destination
         val firstNode = segmentGeometry.firstOrNull()
@@ -102,11 +130,11 @@ class DiscoveryRoutingEngineImpl : DiscoveryRoutingEngine {
                 (if (lastNode != null) haversineMeters(lastNode.latitude, lastNode.longitude, destination.latitude, destination.longitude) else 0.0)
         val etaSeconds = (distanceMeters / WALKING_SPEED_MPS).toLong()
 
-        RouteResult(
+        return RouteResult(
             geometry = geometry,
             etaSeconds = etaSeconds,
             distanceMeters = distanceMeters,
-            routeType = RouteType.CLASSIC
+            routeType = routeType
         )
     }
 

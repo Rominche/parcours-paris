@@ -56,6 +56,7 @@ private val PARIS_BOUNDS = BoundingBox(
 
 /** Format: "destLat,destLng" or "destLat,destLng,origLat,origLng" */
 const val ADDRESS_SEARCH_RESULT = "address_search_result"
+const val ADDRESS_SEARCH_RESULT_LABEL = "address_search_result_label"
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -141,7 +142,10 @@ fun AddressSearchScreen(
         } else {
             "${dest.latitude},${dest.longitude}"
         }
-        navController.previousBackStackEntry?.savedStateHandle?.set(ADDRESS_SEARCH_RESULT, result)
+        navController.previousBackStackEntry?.savedStateHandle?.apply {
+            set(ADDRESS_SEARCH_RESULT, result)
+            set(ADDRESS_SEARCH_RESULT_LABEL, dest.label)
+        }
         navController.popBackStack()
     }
 

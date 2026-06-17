@@ -17,8 +17,6 @@ import com.parcoursparis.util.haversineMeters
 import com.parcoursparis.util.locationFlow
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Job
-import kotlinx.coroutines.async
-import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -38,6 +36,12 @@ private val PARIS_BOUNDS = BoundingBox(
 
 /** Centre de Paris — fallback quand la position GPS n'est pas disponible (émulateur, intérieur). */
 private val PARIS_CENTER = LatLng(48.8566, 2.3522)
+
+/** Alignés sur strings.xml — utilisés dans le ViewModel (hors Compose). */
+private const val ROUTE_ERROR_NO_DESTINATION = "Aucune destination définie"
+private const val ROUTE_ERROR_NO_POSITION = "Position non disponible"
+private const val ROUTE_ERROR_NO_PATH = "Aucun chemin trouvé"
+private const val ROUTE_ERROR_COMPUTE_FAILED = "Erreur de calcul d'itinéraire"
 
 /**
  * ViewModel for the map screen.
@@ -61,6 +65,9 @@ class MapViewModel(
     private var toleranceDebounceJob: Job? = null
     private var segmentSelectionJob: Job? = null
     private var smoothedBearing: Double = 0.0
+    private var pendingRouteRequest: PendingRouteRequest? = null
+
+    private data class PendingRouteRequest(val useParisAsFallback: Boolean)
 
     init {
         viewModelScope.launch {
@@ -71,9 +78,11 @@ class MapViewModel(
         viewModelScope.launch {
             segmentRepository.segmentsWithExploredState
                 .catch { e ->
+                    pendingRouteRequest = null
                     _uiState.update {
                         it.copy(
                             isLoading = false,
+                            isComputingRoute = false,
                             error = e.message ?: "Unknown error"
                         )
                     }
@@ -85,6 +94,12 @@ class MapViewModel(
                             isLoading = false,
                             error = null
                         )
+                    }
+                    pendingRouteRequest?.let { pending ->
+                        if (segments.isNotEmpty()) {
+                            pendingRouteRequest = null
+                            onRequestRoute(useParisAsFallback = pending.useParisAsFallback)
+                        }
                     }
                 }
         }
@@ -280,17 +295,26 @@ class MapViewModel(
     }
 
     /** Appelé quand l'utilisateur revient de la page de recherche avec destination (et optionnellement origine). */
-    fun onAddressSearchResult(destination: LatLng, originOverride: LatLng?) {
+    fun onAddressSearchResult(
+        destination: LatLng,
+        originOverride: LatLng?,
+        destinationLabel: String = "",
+        autoComputeRoute: Boolean = true
+    ) {
         _uiState.update {
             updateSegmentSelectionEnabled(
                 it.copy(
                     destination = destination,
                     originOverride = originOverride,
-                    searchQuery = "",
+                    searchQuery = destinationLabel,
                     searchSuggestions = emptyList(),
-                    searchError = null
+                    searchError = null,
+                    routeError = null
                 )
             )
+        }
+        if (autoComputeRoute) {
+            onRequestRoute(useParisAsFallback = false)
         }
     }
 
@@ -376,17 +400,29 @@ class MapViewModel(
         val useFallback = useParisAsFallback || (origin == null && state.usedParisAsFallback)
 
         if (dest == null) {
-            _uiState.update { it.copy(routeError = "Aucune destination définie") }
+            _uiState.update { it.copy(routeError = ROUTE_ERROR_NO_DESTINATION) }
             return
         }
         if (origin == null) {
             if (useFallback) {
                 origin = PARIS_CENTER
             } else {
-                _uiState.update { it.copy(routeError = "Position non disponible") }
+                _uiState.update { it.copy(routeError = ROUTE_ERROR_NO_POSITION) }
                 return
             }
         }
+        if (segments.isEmpty()) {
+            pendingRouteRequest = PendingRouteRequest(useFallback)
+            _uiState.update {
+                it.copy(
+                    isComputingRoute = true,
+                    routeError = null,
+                    route = null
+                )
+            }
+            return
+        }
+        pendingRouteRequest = null
 
         val tolerance = _uiState.value.tolerancePercent.toDouble()
         val request = RoutingRequest(origin = origin, destination = dest, tolerancePercent = tolerance)
@@ -397,24 +433,12 @@ class MapViewModel(
                 it.copy(isComputingRoute = true, routeError = null, route = null)
             }
             try {
-                val (discoveryResult, classicResult) = coroutineScope {
-                    val discoveryDeferred = async {
-                        discoveryRoutingEngine.computeRoute(
-                            segments = segments,
-                            origin = request.origin,
-                            destination = request.destination,
-                            tolerancePercent = request.tolerancePercent
-                        )
-                    }
-                    val classicDeferred = async {
-                        discoveryRoutingEngine.computeClassicRoute(
-                            segments = segments,
-                            origin = request.origin,
-                            destination = request.destination
-                        )
-                    }
-                    discoveryDeferred.await() to classicDeferred.await()
-                }
+                val (discoveryResult, classicResult) = discoveryRoutingEngine.computeBothRoutes(
+                    segments = segments,
+                    origin = request.origin,
+                    destination = request.destination,
+                    tolerancePercent = request.tolerancePercent
+                )
                 val result = discoveryResult ?: classicResult
                 if (result != null) {
                     _uiState.update {
@@ -442,7 +466,7 @@ class MapViewModel(
                                 route = null,
                                 discoveryRoute = null,
                                 classicRoute = null,
-                                routeError = "Aucun chemin trouvé"
+                                routeError = ROUTE_ERROR_NO_PATH
                             )
                         )
                     }
@@ -457,7 +481,7 @@ class MapViewModel(
                         route = null,
                         discoveryRoute = null,
                         classicRoute = null,
-                        routeError = e.message ?: "Erreur de calcul d'itinéraire"
+                        routeError = e.message ?: ROUTE_ERROR_COMPUTE_FAILED
                     )
                 }
             }

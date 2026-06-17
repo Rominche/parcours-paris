@@ -122,7 +122,7 @@ class MapViewModelSegmentSelectionTest {
     fun destinationDisablesSegmentSelection() = runTest {
         seedSegments()
         advanceUntilIdle()
-        viewModel.onAddressSearchResult(LatLng(48.86, 2.36), null)
+        viewModel.onAddressSearchResult(LatLng(48.86, 2.36), null, autoComputeRoute = false)
         advanceUntilIdle()
 
         val state = viewModel.uiState.value
@@ -138,7 +138,7 @@ class MapViewModelSegmentSelectionTest {
     fun onClearDestination_reEnablesSegmentSelection() = runTest {
         seedSegments()
         advanceUntilIdle()
-        viewModel.onAddressSearchResult(LatLng(48.86, 2.36), null)
+        viewModel.onAddressSearchResult(LatLng(48.86, 2.36), null, autoComputeRoute = false)
         viewModel.onClearDestination()
         advanceUntilIdle()
 

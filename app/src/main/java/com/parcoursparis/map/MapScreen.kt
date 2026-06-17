@@ -43,6 +43,7 @@ import androidx.compose.ui.semantics.testTag
 import androidx.compose.ui.unit.dp
 import androidx.navigation.NavController
 import com.parcoursparis.map.ADDRESS_SEARCH_RESULT
+import com.parcoursparis.map.ADDRESS_SEARCH_RESULT_LABEL
 import com.parcoursparis.map.component.CompassRoseOverlay
 import com.parcoursparis.map.component.RouteBottomSheet
 import com.parcoursparis.map.component.SegmentSelector
@@ -213,13 +214,22 @@ fun MapScreen(navController: NavController) {
             backStackEntry.savedStateHandle.getStateFlow(ADDRESS_SEARCH_RESULT, null)
                 .collect { result: String? ->
                     result?.let { str ->
-                        val parts = str.split(",")
-                        if (parts.size >= 2) {
-                            val dest = LatLng(parts[0].toDouble(), parts[1].toDouble())
-                            val origin = if (parts.size >= 4) {
-                                LatLng(parts[2].toDouble(), parts[3].toDouble())
-                            } else null
-                            viewModel.onAddressSearchResult(dest, origin)
+                        try {
+                            val parts = str.split(",")
+                            if (parts.size >= 2) {
+                                val dest = LatLng(parts[0].toDouble(), parts[1].toDouble())
+                                val origin = if (parts.size >= 4) {
+                                    LatLng(parts[2].toDouble(), parts[3].toDouble())
+                                } else null
+                                val label = backStackEntry.savedStateHandle
+                                    .get<String>(ADDRESS_SEARCH_RESULT_LABEL).orEmpty()
+                                viewModel.onAddressSearchResult(dest, origin, label)
+                            }
+                        } catch (_: NumberFormatException) {
+                            // Coordonnées invalides — ignorer sans crasher
+                        } finally {
+                            backStackEntry.savedStateHandle.remove<String>(ADDRESS_SEARCH_RESULT)
+                            backStackEntry.savedStateHandle.remove<String>(ADDRESS_SEARCH_RESULT_LABEL)
                         }
                     }
                 }
@@ -251,6 +261,22 @@ fun MapScreen(navController: NavController) {
             ) {
                 Text(
                     text = stringResource(R.string.location_permission_denied),
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    style = MaterialTheme.typography.bodyMedium
+                )
+            }
+        }
+        if (uiState.isComputingRoute && uiState.segments.isEmpty()) {
+            Box(
+                modifier = Modifier
+                    .align(Alignment.BottomCenter)
+                    .fillMaxWidth()
+                    .background(MaterialTheme.colorScheme.surfaceVariant)
+                    .padding(horizontal = 16.dp, vertical = 12.dp),
+                contentAlignment = Alignment.Center
+            ) {
+                Text(
+                    text = stringResource(R.string.route_error_segments_loading),
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     style = MaterialTheme.typography.bodyMedium
                 )
@@ -332,14 +358,6 @@ fun MapScreen(navController: NavController) {
                 onRequestDiscoveryRoute = viewModel::onRequestDiscoveryRoute,
                 onStopRoute = viewModel::onStopRoute,
                 onDismissRequest = viewModel::onDismissRouteBottomSheet
-            )
-        }
-        if (uiState.destination == null) {
-            CompassRoseOverlay(
-                mapBearingDegrees = uiState.mapBearing.toFloat(),
-                modifier = Modifier
-                    .align(Alignment.BottomEnd)
-                    .padding(16.dp)
             )
         }
         if (uiState.isSegmentSelectionEnabled && selectedSegment != null) {

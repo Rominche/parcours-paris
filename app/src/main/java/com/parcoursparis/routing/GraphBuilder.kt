@@ -2,7 +2,9 @@ package com.parcoursparis.routing
 
 import com.parcoursparis.data.repository.SegmentWithExploredState
 import com.parcoursparis.util.haversineMeters
+import android.util.Log
 import org.json.JSONArray
+import org.json.JSONException
 import org.maplibre.android.geometry.LatLng
 
 /**
@@ -11,6 +13,8 @@ import org.maplibre.android.geometry.LatLng
  */
 object GraphBuilder {
 
+    private const val TAG = "GraphBuilder"
+
     /**
      * Clé unique pour un nœud (arrondi à 6 décimales pour éviter doublons flottants).
      */
@@ -18,17 +22,23 @@ object GraphBuilder {
 
     /**
      * Parse geometry_json (format GeoJSON LineString: [[lon,lat],[lon,lat],...]) en liste de LatLng.
+     * Retourne une liste vide si le JSON est invalide (segment ignoré).
      */
     fun parseGeometry(geometryJson: String): List<LatLng> {
-        val coords = JSONArray(geometryJson)
-        val result = mutableListOf<LatLng>()
-        for (i in 0 until coords.length()) {
-            val coord = coords.getJSONArray(i)
-            val lon = coord.getDouble(0)
-            val lat = coord.getDouble(1)
-            result.add(LatLng(lat, lon))
+        return try {
+            val coords = JSONArray(geometryJson)
+            val result = mutableListOf<LatLng>()
+            for (i in 0 until coords.length()) {
+                val coord = coords.getJSONArray(i)
+                val lon = coord.getDouble(0)
+                val lat = coord.getDouble(1)
+                result.add(LatLng(lat, lon))
+            }
+            result
+        } catch (e: JSONException) {
+            Log.w(TAG, "geometry_json invalide ignorée: ${e.message}")
+            emptyList()
         }
-        return result
     }
 
     /**
