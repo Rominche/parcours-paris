@@ -51,4 +51,16 @@ class FakeDiscoveryRoutingEngine : DiscoveryRoutingEngine {
         throwOnCompute?.let { throw it }
         return nextClassicResult
     }
+
+    override suspend fun computeBothRoutes(
+        segments: List<SegmentWithExploredState>,
+        origin: LatLng,
+        destination: LatLng,
+        tolerancePercent: Double
+    ): Pair<RouteResult?, RouteResult?> {
+        _computeCalls.value = _computeCalls.value + ComputeCall(origin, destination, tolerancePercent)
+        _classicComputeCalls.value = _classicComputeCalls.value + ClassicComputeCall(origin, destination)
+        throwOnCompute?.let { throw it }
+        return nextResult to nextClassicResult
+    }
 }

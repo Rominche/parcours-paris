@@ -38,3 +38,4 @@ local.properties
 
 # Android Profiling
 *.hprof
+.kotlin/

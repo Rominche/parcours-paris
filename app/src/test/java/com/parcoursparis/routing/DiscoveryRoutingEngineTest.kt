@@ -8,12 +8,17 @@ import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
+import org.junit.runner.RunWith
 import org.maplibre.android.geometry.LatLng
+import org.robolectric.RobolectricTestRunner
+import org.robolectric.annotation.Config
 
 /**
  * Unit tests for DiscoveryRoutingEngine.
  * Verifies: graphe simple, favorise segments non explorés, respecte tolérance.
  */
+@RunWith(RobolectricTestRunner::class)
+@Config(sdk = [28])
 class DiscoveryRoutingEngineTest {
 
     private val engine = DiscoveryRoutingEngineImpl()
@@ -38,12 +43,13 @@ class DiscoveryRoutingEngineTest {
 
     @Test
     fun computeRoute_noPath_returnsNull() = runTest {
-        // Single isolated segment
+        // Deux composantes déconnectées : pas de chemin même après snap au nœud le plus proche
         val segments = listOf(
-            SegmentWithExploredState(Segment(1L, "[[2.35,48.85],[2.36,48.86]]"), false)
+            SegmentWithExploredState(Segment(1L, "[[2.35,48.85],[2.36,48.86]]"), false),
+            SegmentWithExploredState(Segment(2L, "[[2.50,48.95],[2.51,48.96]]"), false)
         )
         val origin = LatLng(48.85, 2.35)
-        val dest = LatLng(48.90, 2.45) // Far away, no connection
+        val dest = LatLng(48.955, 2.505)
 
         val result = engine.computeRoute(segments, origin, dest, 15.0)
 
@@ -115,10 +121,11 @@ class DiscoveryRoutingEngineTest {
     @Test
     fun computeClassicRoute_noPath_returnsNull() = runTest {
         val segments = listOf(
-            SegmentWithExploredState(Segment(1L, "[[2.35,48.85],[2.36,48.86]]"), false)
+            SegmentWithExploredState(Segment(1L, "[[2.35,48.85],[2.36,48.86]]"), false),
+            SegmentWithExploredState(Segment(2L, "[[2.50,48.95],[2.51,48.96]]"), false)
         )
         val origin = LatLng(48.85, 2.35)
-        val dest = LatLng(48.90, 2.45)
+        val dest = LatLng(48.955, 2.505)
 
         val result = engine.computeClassicRoute(segments, origin, dest)
 

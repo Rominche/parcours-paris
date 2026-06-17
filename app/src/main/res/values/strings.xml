@@ -16,6 +16,8 @@
     <string name="route_error_no_position">Position non disponible</string>
     <string name="route_error_use_paris_fallback">Utiliser Paris comme point de départ</string>
     <string name="route_error_no_path">Aucun chemin trouvé</string>
+    <string name="route_error_compute_failed">Erreur de calcul d\'itinéraire</string>
+    <string name="route_error_segments_loading">Chargement des rues en cours, veuillez patienter…</string>
     <string name="tolerance_label">Surplus temps max : %d %%</string>
     <string name="route_eta_format">~%d min</string>
     <string name="route_distance_format">%.1f km</string>
