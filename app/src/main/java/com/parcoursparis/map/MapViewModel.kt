@@ -5,6 +5,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.parcoursparis.data.preferences.UserPreferencesRepository
 import com.parcoursparis.data.repository.SegmentRepository
+import com.parcoursparis.data.repository.SegmentWithExploredState
 import com.parcoursparis.map.geocoding.BoundingBox
 import com.parcoursparis.map.geocoding.GeocodingNetworkException
 import com.parcoursparis.map.geocoding.GeocodingResult
@@ -16,6 +17,7 @@ import com.parcoursparis.util.bearingDegrees
 import com.parcoursparis.util.haversineMeters
 import com.parcoursparis.util.locationFlow
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.async
 import kotlinx.coroutines.coroutineScope
@@ -26,6 +28,7 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import org.maplibre.android.geometry.LatLng
 
 /** Paris area bounds for geocoding (Nominatim viewbox). */
@@ -35,6 +38,9 @@ private val PARIS_BOUNDS = BoundingBox(
     maxLon = 2.4,
     maxLat = 48.92
 )
+
+/** Âge max d'une position GPS pour le marquage automatique. */
+private const val STALE_LOCATION_MS = 30_000L
 
 /** Centre de Paris — fallback quand la position GPS n'est pas disponible (émulateur, intérieur). */
 private val PARIS_CENTER = LatLng(48.8566, 2.3522)
@@ -62,6 +68,16 @@ class MapViewModel(
     private var segmentSelectionJob: Job? = null
     private var smoothedBearing: Double = 0.0
 
+    /** Index spatial des rues (tap carte + suivi GPS), construit une fois les segments chargés. */
+    @Volatile
+    private var segmentIndex: SegmentSpatialIndex? = null
+    private var walkTracker: WalkTracker? = null
+    private var indexJob: Job? = null
+
+    /** Identifiants des rues déjà parcourues (consulté à chaque position GPS). */
+    @Volatile
+    private var exploredIds: Set<Long> = emptySet()
+
     init {
         viewModelScope.launch {
             userPreferences.tolerancePercent.collect { tolerance ->
@@ -79,6 +95,11 @@ class MapViewModel(
                     }
                 }
                 .collect { segments ->
+                    exploredIds = segments.asSequence()
+                        .filter { it.isExplored }
+                        .map { it.segment.osm_way_id }
+                        .toHashSet()
+                    prepareSegmentIndex(segments)
                     _uiState.update {
                         it.copy(
                             segments = segments,
@@ -92,6 +113,43 @@ class MapViewModel(
             segmentRepository.progressStats.collect { stats ->
                 _uiState.update { it.copy(progressStats = stats) }
             }
+        }
+    }
+
+    /**
+     * Construit en arrière-plan l'index spatial et le graphe de routing (une seule fois :
+     * la géométrie des rues ne change pas, seul leur état exploré évolue).
+     */
+    private fun prepareSegmentIndex(segments: List<SegmentWithExploredState>) {
+        if (segments.isEmpty() || indexJob != null) return
+        indexJob = viewModelScope.launch {
+            val index = withContext(Dispatchers.Default) { SegmentSpatialIndex.build(segments) }
+            walkTracker = WalkTracker(index)
+            segmentIndex = index
+            discoveryRoutingEngine.prepare(segments)
+        }
+    }
+
+    /** Marque automatiquement les rues parcourues à partir de la position GPS. */
+    private suspend fun trackWalk(location: android.location.Location) {
+        val tracker = walkTracker ?: return
+        // Ignore la dernière position connue si elle est ancienne (émise au démarrage du GPS).
+        if (location.time > 0 && System.currentTimeMillis() - location.time > STALE_LOCATION_MS) return
+        val accuracy = if (location.hasAccuracy()) location.accuracy else null
+        val newlyExplored = tracker.onLocation(
+            lat = location.latitude,
+            lon = location.longitude,
+            accuracyMeters = accuracy,
+            timeMillis = location.time.takeIf { it > 0 }
+        ) { it in exploredIds }
+        if (newlyExplored.isEmpty()) return
+        val now = System.currentTimeMillis()
+        try {
+            newlyExplored.forEach { segmentRepository.markAsExplored(it, now) }
+        } catch (e: CancellationException) {
+            throw e
+        } catch (_: Exception) {
+            // Échec d'écriture ponctuel : on ne coupe pas le suivi GPS.
         }
     }
 
@@ -121,15 +179,21 @@ class MapViewModel(
             density = displayDensity
         )
         segmentSelectionJob?.cancel()
+        val index = segmentIndex
         segmentSelectionJob = viewModelScope.launch {
-            val nearest = SegmentSelectionUtils.findNearestSegment(
-                tapLat = latLng.latitude,
-                tapLon = latLng.longitude,
-                segments = segments,
-                maxDistanceMeters = tolerance
-            )
+            // Index spatial : quelques millisecondes. Avant qu'il soit prêt, recherche exhaustive.
+            val nearestId = if (index != null) {
+                index.nearest(latLng.latitude, latLng.longitude, tolerance)?.segmentId
+            } else {
+                SegmentSelectionUtils.findNearestSegment(
+                    tapLat = latLng.latitude,
+                    tapLon = latLng.longitude,
+                    segments = segments,
+                    maxDistanceMeters = tolerance
+                )?.segment?.osm_way_id
+            }
             _uiState.update {
-                it.copy(selectedSegmentId = nearest?.segment?.osm_way_id)
+                it.copy(selectedSegmentId = nearestId)
             }
         }
     }
@@ -147,6 +211,7 @@ class MapViewModel(
 
     fun onMarkSelectedUnexplored() {
         val segmentId = _uiState.value.selectedSegmentId ?: return
+        walkTracker?.forget(segmentId)
         viewModelScope.launch {
             segmentRepository.markAsUnexplored(segmentId)
         }
@@ -169,6 +234,7 @@ class MapViewModel(
                 locationFlow(appContext)
                     .catch { _uiState.update { it.copy(userLocation = null) } }
                     .collect { location ->
+                        if (location != null) trackWalk(location)
                         _uiState.update { state ->
                             val latLng = location?.let { LatLng(it.latitude, it.longitude) }
                             val bearing = if (state.route != null && location != null && latLng != null) {
@@ -474,9 +540,9 @@ class MapViewModel(
         if (route == null || userLocation == null || route.geometry.size < 2) {
             return state
         }
-        val segmentIndex = RouteProgressUtils.projectPointOnPolyline(userLocation, route.geometry)
-        if (segmentIndex < 0) return state
-        val remaining = RouteProgressUtils.distanceRemaining(route.geometry, segmentIndex, userLocation)
+        val routeSegmentIndex = RouteProgressUtils.projectPointOnPolyline(userLocation, route.geometry)
+        if (routeSegmentIndex < 0) return state
+        val remaining = RouteProgressUtils.distanceRemaining(route.geometry, routeSegmentIndex, userLocation)
         val total = route.distanceMeters
         val progressPercent = if (total > 0) {
             val traveled = total - remaining

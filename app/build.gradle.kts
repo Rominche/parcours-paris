@@ -79,6 +79,8 @@ dependencies {
 
     // Testing
     testImplementation("junit:junit:4.13.2")
+    // Vraie implémentation d'org.json pour les tests JVM (android.jar n'en fournit que des stubs).
+    testImplementation("org.json:json:20240303")
     testImplementation("org.jetbrains.kotlinx:kotlinx-coroutines-test:1.8.1")
     testImplementation("androidx.room:room-testing:2.8.4")
     testImplementation("org.robolectric:robolectric:4.13")
