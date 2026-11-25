@@ -12,6 +12,7 @@ import com.parcoursparis.map.geocoding.GeocodingResult
 import com.parcoursparis.map.geocoding.GeocodingService
 import com.parcoursparis.routing.DiscoveryRoutingEngine
 import com.parcoursparis.routing.RoutingRequest
+import com.parcoursparis.util.MIN_SPEED_FOR_GPS_COURSE_MPS
 import com.parcoursparis.util.RouteProgressUtils
 import com.parcoursparis.util.bearingDegrees
 import com.parcoursparis.util.haversineMeters
@@ -246,9 +247,13 @@ class MapViewModel(
                             } else {
                                 0.0
                             }
+                            val course = location?.takeIf {
+                                it.hasBearing() && it.hasSpeed() && it.speed >= MIN_SPEED_FOR_GPS_COURSE_MPS
+                            }?.bearing?.toDouble()
                             val updated = state.copy(
                                 userLocation = latLng,
-                                mapBearing = bearing
+                                mapBearing = bearing,
+                                userCourseDegrees = course
                             )
                             updateRouteProgress(updated)
                         }

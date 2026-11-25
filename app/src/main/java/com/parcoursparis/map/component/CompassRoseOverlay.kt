@@ -5,11 +5,13 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.drawscope.Stroke
@@ -19,7 +21,8 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 
 /**
- * Rose des vents : le N reste aligné sur le nord géographique quand la carte pivote.
+ * Rose des vents (N, E, S, O) : le N reste aligné sur le nord géographique quand la carte pivote
+ * (en navigation, la carte suit la direction de marche).
  */
 @Composable
 fun CompassRoseOverlay(
@@ -33,12 +36,13 @@ fun CompassRoseOverlay(
     Box(
         modifier = modifier
             .graphicsLayer { rotationZ = -mapBearingDegrees }
-            .background(surfaceColor.copy(alpha = 0.9f))
-            .padding(8.dp)
-            .size(48.dp),
+            .shadow(2.dp, CircleShape)
+            .background(surfaceColor.copy(alpha = 0.95f), CircleShape)
+            .padding(4.dp)
+            .size(56.dp),
         contentAlignment = Alignment.Center
     ) {
-        Canvas(modifier = Modifier.size(40.dp)) {
+        Canvas(modifier = Modifier.size(34.dp)) {
             val center = Offset(size.width / 2f, size.height / 2f)
             val radius = size.minDimension / 2f - 2f
 
@@ -67,14 +71,11 @@ fun CompassRoseOverlay(
             }
             drawPath(southPath, onSurfaceColor.copy(alpha = 0.45f))
         }
-        Text(
-            text = "N",
-            modifier = Modifier.align(Alignment.TopCenter).padding(top = 2.dp),
-            style = MaterialTheme.typography.labelSmall.copy(
-                fontSize = 9.sp,
-                fontWeight = FontWeight.Bold
-            ),
-            color = northColor
-        )
+        val labelStyle = MaterialTheme.typography.labelSmall.copy(fontSize = 9.sp, fontWeight = FontWeight.Bold)
+        val secondaryColor = onSurfaceColor.copy(alpha = 0.7f)
+        Text("N", Modifier.align(Alignment.TopCenter), style = labelStyle, color = northColor)
+        Text("S", Modifier.align(Alignment.BottomCenter), style = labelStyle, color = secondaryColor)
+        Text("E", Modifier.align(Alignment.CenterEnd), style = labelStyle, color = secondaryColor)
+        Text("O", Modifier.align(Alignment.CenterStart), style = labelStyle, color = secondaryColor)
     }
 }

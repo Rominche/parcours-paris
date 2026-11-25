@@ -49,7 +49,10 @@ import com.parcoursparis.map.component.SegmentSelector
 import com.parcoursparis.navigation.NavRoutes
 import org.maplibre.android.geometry.LatLng
 import androidx.core.content.ContextCompat
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
+import com.parcoursparis.util.HeadingUtils
+import com.parcoursparis.util.compassHeadingFlow
 import com.parcoursparis.ParcoursParisApplication
 import com.parcoursparis.R
 
@@ -69,6 +72,25 @@ fun MapScreen(navController: NavController) {
         )
     )
     val uiState by viewModel.uiState.collectAsState()
+    // Boussole du téléphone : capteur actif seulement quand l'écran est visible.
+    val compassFlow = remember(context) { compassHeadingFlow(context) }
+    val compassHeading by compassFlow.collectAsStateWithLifecycle(initialValue = null)
+    val userLocationForDeclination = uiState.userLocation
+    val declination = remember(userLocationForDeclination == null) {
+        userLocationForDeclination?.let {
+            android.hardware.GeomagneticField(
+                it.latitude.toFloat(),
+                it.longitude.toFloat(),
+                0f,
+                System.currentTimeMillis()
+            ).declination.toDouble()
+        } ?: 0.0
+    }
+    val userHeading = if (uiState.userLocation != null) {
+        HeadingUtils.chooseHeading(uiState.userCourseDegrees, compassHeading, declination)
+    } else {
+        null
+    }
     val mapContentDesc = stringResource(R.string.map_content_description)
     val routeComputeButtonDesc = stringResource(R.string.route_compute_button)
     val selectedSegment = uiState.selectedSegmentId?.let { id ->
@@ -141,6 +163,7 @@ fun MapScreen(navController: NavController) {
         MapLibreMap(
             segments = uiState.segments,
             userLocation = uiState.userLocation,
+            userHeading = userHeading,
             route = uiState.route,
             mapBearing = uiState.mapBearing,
             navigationMode = uiState.route != null,
@@ -332,14 +355,6 @@ fun MapScreen(navController: NavController) {
                 onRequestDiscoveryRoute = viewModel::onRequestDiscoveryRoute,
                 onStopRoute = viewModel::onStopRoute,
                 onDismissRequest = viewModel::onDismissRouteBottomSheet
-            )
-        }
-        if (uiState.destination == null) {
-            CompassRoseOverlay(
-                mapBearingDegrees = uiState.mapBearing.toFloat(),
-                modifier = Modifier
-                    .align(Alignment.BottomEnd)
-                    .padding(16.dp)
             )
         }
         if (uiState.isSegmentSelectionEnabled && selectedSegment != null) {

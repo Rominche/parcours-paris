@@ -35,13 +35,17 @@ import org.maplibre.android.maps.Style
 import org.maplibre.android.style.expressions.Expression
 import org.maplibre.android.style.layers.CircleLayer
 import org.maplibre.android.style.layers.LineLayer
+import org.maplibre.android.style.layers.Property
 import org.maplibre.android.style.layers.PropertyFactory
+import org.maplibre.android.style.layers.SymbolLayer
 import org.maplibre.android.style.sources.GeoJsonSource
 import org.maplibre.android.camera.CameraUpdateFactory
 
 private const val TAG = "MapLibreMap"
 private const val USER_LOCATION_SOURCE_ID = "user-location-source"
 private const val USER_LOCATION_LAYER_ID = "user-location-layer"
+private const val USER_HEADING_LAYER_ID = "user-heading-layer"
+private const val USER_HEADING_IMAGE_ID = "user-heading-arrow"
 private const val PARIS_LAT = 48.8566
 private const val PARIS_LON = 2.3522
 private const val PARIS_ZOOM = 11.5
@@ -73,6 +77,48 @@ private fun routeToGeoJsonLineString(route: RouteResult): String {
     return """{"type":"LineString","coordinates":[$coords]}"""
 }
 
+/**
+ * GeoJSON de la position utilisateur. La propriété `heading` (degrés, 0 = nord) oriente le
+ * pointeur ; absente, le pointeur est masqué.
+ */
+private fun userLocationGeoJson(location: LatLng?, heading: Double?): String {
+    if (location == null) return """{"type":"FeatureCollection","features":[]}"""
+    val properties = if (heading != null) """{"heading":$heading}""" else "{}"
+    return """{"type":"FeatureCollection","features":[{"type":"Feature","geometry":{"type":"Point","coordinates":[${location.longitude},${location.latitude}]},"properties":$properties}]}"""
+}
+
+/**
+ * Pointeur de direction : flèche dont la pointe dépasse du point de position, vers le haut
+ * (nord) ; MapLibre la fait tourner selon le cap.
+ */
+private fun createHeadingArrowBitmap(context: android.content.Context): android.graphics.Bitmap {
+    val density = context.resources.displayMetrics.density
+    val sizePx = (48 * density).toInt()
+    val bitmap = android.graphics.Bitmap.createBitmap(sizePx, sizePx, android.graphics.Bitmap.Config.ARGB_8888)
+    val canvas = android.graphics.Canvas(bitmap)
+    val c = sizePx / 2f
+    val path = android.graphics.Path().apply {
+        moveTo(c, c - 22 * density)          // pointe
+        lineTo(c + 11 * density, c - 2 * density)
+        lineTo(c, c - 6 * density)           // encoche
+        lineTo(c - 11 * density, c - 2 * density)
+        close()
+    }
+    val fill = android.graphics.Paint(android.graphics.Paint.ANTI_ALIAS_FLAG).apply {
+        color = android.graphics.Color.parseColor(COLOR_USER_LOCATION)
+        style = android.graphics.Paint.Style.FILL
+    }
+    val stroke = android.graphics.Paint(android.graphics.Paint.ANTI_ALIAS_FLAG).apply {
+        color = android.graphics.Color.WHITE
+        style = android.graphics.Paint.Style.STROKE
+        strokeWidth = 2 * density
+        strokeJoin = android.graphics.Paint.Join.ROUND
+    }
+    canvas.drawPath(path, stroke)
+    canvas.drawPath(path, fill)
+    return bitmap
+}
+
 /** État de la caméra pour l'échelle (zoom, latitude du centre). */
 data class CameraScaleState(val zoom: Double, val centerLat: Double)
 
@@ -80,6 +126,8 @@ data class CameraScaleState(val zoom: Double, val centerLat: Double)
 fun MapLibreMap(
     segments: List<SegmentWithExploredState>,
     userLocation: org.maplibre.android.geometry.LatLng? = null,
+    /** Cap de l'utilisateur (degrés, 0 = nord) pour le pointeur de direction ; null = masqué. */
+    userHeading: Double? = null,
     route: RouteResult? = null,
     mapBearing: Double = 0.0,
     navigationMode: Boolean = false,
@@ -100,6 +148,7 @@ fun MapLibreMap(
     // HIGH-1: toujours accéder à la version la plus récente des segments dans les callbacks async
     val currentSegments = rememberUpdatedState(segments)
     val currentUserLocation = rememberUpdatedState(userLocation)
+    val currentUserHeading = rememberUpdatedState(userHeading)
     val currentRoute = rememberUpdatedState(route)
     val currentSelectionEnabled = rememberUpdatedState(segmentSelectionEnabled)
     val currentOnMapClick = rememberUpdatedState(onMapClick)
@@ -233,11 +282,22 @@ fun MapLibreMap(
                         locationSourceRef.value = locationSource
                         // Appliquer immédiatement si une position GPS était déjà connue avant
                         // le chargement du style (évite la race condition au démarrage)
-                        currentUserLocation.value?.let { loc ->
-                            locationSource.setGeoJson(
-                                """{"type":"FeatureCollection","features":[{"type":"Feature","geometry":{"type":"Point","coordinates":[${loc.longitude},${loc.latitude}]},"properties":{}}]}"""
+                        locationSource.setGeoJson(
+                            userLocationGeoJson(currentUserLocation.value, currentUserHeading.value)
+                        )
+                        // Pointeur de direction, sous le point de position. Alignement « map » :
+                        // le cap reste relatif au nord même quand la carte pivote.
+                        style.addImage(USER_HEADING_IMAGE_ID, createHeadingArrowBitmap(ctx))
+                        val headingLayer = SymbolLayer(USER_HEADING_LAYER_ID, USER_LOCATION_SOURCE_ID)
+                            .withFilter(Expression.has("heading"))
+                            .withProperties(
+                                PropertyFactory.iconImage(USER_HEADING_IMAGE_ID),
+                                PropertyFactory.iconRotate(Expression.get("heading")),
+                                PropertyFactory.iconRotationAlignment(Property.ICON_ROTATION_ALIGNMENT_MAP),
+                                PropertyFactory.iconAllowOverlap(true),
+                                PropertyFactory.iconIgnorePlacement(true)
                             )
-                        }
+                        style.addLayer(headingLayer)
                         val locationLayer = CircleLayer(
                             USER_LOCATION_LAYER_ID,
                             USER_LOCATION_SOURCE_ID
@@ -290,15 +350,8 @@ fun MapLibreMap(
         )
     }
 
-    LaunchedEffect(userLocation) {
-        locationSourceRef.value?.let { source ->
-            val geoJson = if (userLocation != null) {
-                """{"type":"FeatureCollection","features":[{"type":"Feature","geometry":{"type":"Point","coordinates":[${userLocation.longitude},${userLocation.latitude}]},"properties":{}}]}"""
-            } else {
-                """{"type":"FeatureCollection","features":[]}"""
-            }
-            source.setGeoJson(geoJson)
-        }
+    LaunchedEffect(userLocation, userHeading) {
+        locationSourceRef.value?.setGeoJson(userLocationGeoJson(userLocation, userHeading))
     }
 
     LaunchedEffect(userLocation, navigationMode, mapBearing) {

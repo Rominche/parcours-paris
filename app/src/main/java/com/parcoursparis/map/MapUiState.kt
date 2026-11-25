@@ -42,5 +42,7 @@ data class MapUiState(
     /** Marquage manuel actif (pas de destination ni d'itinéraire en cours). */
     val isSegmentSelectionEnabled: Boolean = true,
     /** Orientation de la carte (0 = nord en haut). Utilisé en navigation GPS. */
-    val mapBearing: Double = 0.0
+    val mapBearing: Double = 0.0,
+    /** Cap GPS (degrés, 0 = nord) quand l'utilisateur marche ; null à l'arrêt ou sans cap fiable. */
+    val userCourseDegrees: Double? = null
 )
